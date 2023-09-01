@@ -1,0 +1,23 @@
+.body_div {
+    padding:5px;
+    overflow-y:auto;
+    margin-bottom : 2%;
+    height:82%;
+}
+
+#order-details h1 {
+    font-weight:bold;
+}
+
+.back-tab {
+    float: right;
+    padding-left: 15px;
+    padding-right: 15px;
+    position: relative;
+    top: -30px;
+}
+
+.postfinancecheckout-loader {
+    display: none;
+}
+

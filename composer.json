@@ -1,0 +1,16 @@
+{
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/wallee-payment/php-sdk"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "WalleePayment\\": "Wallee/"
+    }
+  },
+  "require": {
+    "wallee/sdk": "3.2.0"
+  }
+}

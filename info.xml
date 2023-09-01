@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jtlshopplugin>
+    <Name>PostFinanceCheckout Payment</Name>
+    <Description>PostFinanceCheckout Payment for JTL-Shop 5+</Description>
+    <Author>postfinancecheckout AG</Author>
+    <URL>https://www.wallee.com</URL>
+    <XMLVersion>100</XMLVersion>
+    <ShopVersion>5.0.0</ShopVersion>
+    <Icon>logo.jpg</Icon>
+    <PluginID>jtl_postfinancecheckout</PluginID>
+    <CreateDate>2023-05-29</CreateDate>
+    <Version>1.0.0</Version>
+    <Install>
+        <Locales>
+            <Variable>
+                <Name>jtl_postfinancecheckout_payment_not_available_by_country_or_currency</Name>
+                <VariableLocalized iso="GER">Die Zahlung ist für dieses Land oder diese Währung nicht möglich. Bitte verwenden Sie eine andere</VariableLocalized>
+                <VariableLocalized iso="ENG">Payment is not available for this country or currency, please use another one</VariableLocalized>
+                <VariableLocalized iso="ITA">Il pagamento non è disponibile per questo Paese o valuta, utilizzane un altro</VariableLocalized>
+                <VariableLocalized iso="FRA">Le paiement n'est pas disponible pour ce pays ou cette devise, veuillez en utiliser un autre</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_need_to_install_sdk</Name>
+                <VariableLocalized iso="GER">Bitte installieren Sie SDK: Gehen Sie zu Plugins/jtl_postfinancecheckout und führen Sie composer install aus</VariableLocalized>
+                <VariableLocalized iso="ENG">Please install sdk: go to plugins/jtl_postfinancecheckout and run composer install</VariableLocalized>
+                <VariableLocalized iso="ITA">Installa sdk: vai su plugins/jtl_postfinancecheckout ed esegui composer install</VariableLocalized>
+                <VariableLocalized iso="FRA">Veuillez installer le SDK : accédez à plugins/jtl_postfinancecheckout et exécutez composer install</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_incorrect_user_id_or_application_key</Name>
+                <VariableLocalized iso="GER">Falsche userID oder applicationKey</VariableLocalized>
+                <VariableLocalized iso="ENG">Incorrect userID or applicationKey</VariableLocalized>
+                <VariableLocalized iso="ITA">Errati userID o applicationKey</VariableLocalized>
+                <VariableLocalized iso="FRA">Incorrect userID ou applicationKey</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_empty_space_id</Name>
+                <VariableLocalized iso="GER">Leere spaceID</VariableLocalized>
+                <VariableLocalized iso="ENG">Empty spaceID</VariableLocalized>
+                <VariableLocalized iso="ITA">Vuoto spaceID</VariableLocalized>
+                <VariableLocalized iso="FRA">Vide spaceID</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_cant_fetch_payment_methods</Name>
+                <VariableLocalized iso="GER">Zahlungsmethoden können nicht abgerufen werden. Fehler:</VariableLocalized>
+                <VariableLocalized iso="ENG">Can't fetch payment methods. Error:</VariableLocalized>
+                <VariableLocalized iso="ITA">Impossibile recuperare i metodi di pagamento. Errore:</VariableLocalized>
+                <VariableLocalized iso="FRA">Impossible de récupérer les modes de paiement. Erreur:</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_payment_methods_were_synchronised</Name>
+                <VariableLocalized iso="GER">Zahlungsmethoden wurden erfolgreich synchronisiert</VariableLocalized>
+                <VariableLocalized iso="ENG">Payment methods were synchronised successfully</VariableLocalized>
+                <VariableLocalized iso="ITA">I metodi di pagamento sono stati sincronizzati con successo</VariableLocalized>
+                <VariableLocalized iso="FRA">Les méthodes de paiement ont été synchronisées avec succès</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_order_status_partially_shipped</Name>
+                <VariableLocalized iso="GER">Teilversendet</VariableLocalized>
+                <VariableLocalized iso="ENG">Partially shipped</VariableLocalized>
+                <VariableLocalized iso="ITA">Parzialmente spedito</VariableLocalized>
+                <VariableLocalized iso="FRA">Partiellement expédié</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_order_status_shipped</Name>
+                <VariableLocalized iso="GER">Versendet</VariableLocalized>
+                <VariableLocalized iso="ENG">Shipped</VariableLocalized>
+                <VariableLocalized iso="ITA">Spedito</VariableLocalized>
+                <VariableLocalized iso="FRA">Expédié</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_order_status_paid</Name>
+                <VariableLocalized iso="GER">Bezahlt</VariableLocalized>
+                <VariableLocalized iso="ENG">Paid</VariableLocalized>
+                <VariableLocalized iso="ITA">Pagato</VariableLocalized>
+                <VariableLocalized iso="FRA">Payé</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_order_status_in_processing</Name>
+                <VariableLocalized iso="GER">In Bearbeitung</VariableLocalized>
+                <VariableLocalized iso="ENG">In Progress</VariableLocalized>
+                <VariableLocalized iso="ITA">In Lavorazione</VariableLocalized>
+                <VariableLocalized iso="FRA">Traitement</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_order_status_open</Name>
+                <VariableLocalized iso="GER">Offen</VariableLocalized>
+                <VariableLocalized iso="ENG">Open</VariableLocalized>
+                <VariableLocalized iso="ITA">Aprire</VariableLocalized>
+                <VariableLocalized iso="FRA">Ouvrir</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_order_status_cancelled</Name>
+                <VariableLocalized iso="GER">Storno</VariableLocalized>
+                <VariableLocalized iso="ENG">Cancelled</VariableLocalized>
+                <VariableLocalized iso="ITA">Annullato</VariableLocalized>
+                <VariableLocalized iso="FRA">Annulé</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_there_are_no_orders</Name>
+                <VariableLocalized iso="GER">Es liegen keine PostFinanceCheckout Bestellungen vor</VariableLocalized>
+                <VariableLocalized iso="ENG">There are no PostFinanceCheckout orders</VariableLocalized>
+                <VariableLocalized iso="ITA">Non sono presenti ordini PostFinanceCheckout</VariableLocalized>
+                <VariableLocalized iso="FRA">Il n’y a aucune commande PostFinanceCheckout</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_order_status</Name>
+                <VariableLocalized iso="GER">Bestellstatus</VariableLocalized>
+                <VariableLocalized iso="ENG">Order Status</VariableLocalized>
+                <VariableLocalized iso="ITA">Lo stato dell'ordine</VariableLocalized>
+                <VariableLocalized iso="FRA">Statut de la commande</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_payment_method</Name>
+                <VariableLocalized iso="GER">Bezahlverfahren</VariableLocalized>
+                <VariableLocalized iso="ENG">Payment Method</VariableLocalized>
+                <VariableLocalized iso="ITA">Metodo di Pagamento</VariableLocalized>
+                <VariableLocalized iso="FRA">Mode de Paiement</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_customer</Name>
+                <VariableLocalized iso="GER">Kunde</VariableLocalized>
+                <VariableLocalized iso="ENG">Customer</VariableLocalized>
+                <VariableLocalized iso="ITA">Cliente</VariableLocalized>
+                <VariableLocalized iso="FRA">Client</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_order_number</Name>
+                <VariableLocalized iso="GER">Bestellnummer</VariableLocalized>
+                <VariableLocalized iso="ENG">Order number</VariableLocalized>
+                <VariableLocalized iso="ITA">Numero d'ordine</VariableLocalized>
+                <VariableLocalized iso="FRA">Numéro de Commande</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_transaction_id</Name>
+                <VariableLocalized iso="GER">Transaction ID</VariableLocalized>
+                <VariableLocalized iso="ENG">Transaction ID</VariableLocalized>
+                <VariableLocalized iso="ITA">ID della Transazione</VariableLocalized>
+                <VariableLocalized iso="FRA">ID de Transaction</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_transaction_state</Name>
+                <VariableLocalized iso="GER">Transaktionsstatus</VariableLocalized>
+                <VariableLocalized iso="ENG">Transaction State</VariableLocalized>
+                <VariableLocalized iso="ITA">Stato della Transazione</VariableLocalized>
+                <VariableLocalized iso="FRA">État de la Transaction</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_transaction_no_possible_actions</Name>
+                <VariableLocalized iso="GER">Für diese Transaktion sind keine Aktionen möglich, da der aktuelle Status lautet</VariableLocalized>
+                <VariableLocalized iso="ENG">No possible actions for this transaction, because current state is</VariableLocalized>
+                <VariableLocalized iso="ITA">Nessuna azione possibile per questa transazione perché lo stato attuale lo è</VariableLocalized>
+                <VariableLocalized iso="FRA">Aucune action possible pour cette transaction, car l'état actuel est</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_complete</Name>
+                <VariableLocalized iso="GER">Vollständig</VariableLocalized>
+                <VariableLocalized iso="ENG">Complete</VariableLocalized>
+                <VariableLocalized iso="ITA">Completare</VariableLocalized>
+                <VariableLocalized iso="FRA">Complet</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_cancel</Name>
+                <VariableLocalized iso="GER">Stornieren</VariableLocalized>
+                <VariableLocalized iso="ENG">Cancel</VariableLocalized>
+                <VariableLocalized iso="ITA">Annulla</VariableLocalized>
+                <VariableLocalized iso="FRA">Annuler</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_refunds</Name>
+                <VariableLocalized iso="GER">Rückerstattungen</VariableLocalized>
+                <VariableLocalized iso="ENG">Refunds</VariableLocalized>
+                <VariableLocalized iso="ITA">Rimborsi</VariableLocalized>
+                <VariableLocalized iso="FRA">Remboursements</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_download_invoice</Name>
+                <VariableLocalized iso="GER">Herunterladen</VariableLocalized>
+                <VariableLocalized iso="ENG">Download Invoice</VariableLocalized>
+                <VariableLocalized iso="ITA">Scarica Fattura</VariableLocalized>
+                <VariableLocalized iso="FRA">Télécharger la Facture</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_download_packaging_slip</Name>
+                <VariableLocalized iso="GER">Packzettel herunterladen</VariableLocalized>
+                <VariableLocalized iso="ENG">Download Packaging Slip</VariableLocalized>
+                <VariableLocalized iso="ITA">Scarica la Distinta di Imballaggio</VariableLocalized>
+                <VariableLocalized iso="FRA">Télécharger le Bordereau d'emballage</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_make_refund</Name>
+                <VariableLocalized iso="GER">Erstatten</VariableLocalized>
+                <VariableLocalized iso="ENG">Make a refund</VariableLocalized>
+                <VariableLocalized iso="ITA">Effettua un Rimborso</VariableLocalized>
+                <VariableLocalized iso="FRA">Effectuer un Remboursement</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_amount_to_refund</Name>
+                <VariableLocalized iso="GER">Zu erstattender Betrag</VariableLocalized>
+                <VariableLocalized iso="ENG">Amount to refund</VariableLocalized>
+                <VariableLocalized iso="ITA">Importo da Rimborsare</VariableLocalized>
+                <VariableLocalized iso="FRA">Montant à Rembourser</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_refund_now</Name>
+                <VariableLocalized iso="GER">Jetzt erstatten</VariableLocalized>
+                <VariableLocalized iso="ENG">Refund now</VariableLocalized>
+                <VariableLocalized iso="ITA">Rimborso Adesso</VariableLocalized>
+                <VariableLocalized iso="FRA">Rembourser Maintenant</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_refunded_amount</Name>
+                <VariableLocalized iso="GER">Erstatteter Betrag</VariableLocalized>
+                <VariableLocalized iso="ENG">Refunded Amount</VariableLocalized>
+                <VariableLocalized iso="ITA">Importo Rimborsato</VariableLocalized>
+                <VariableLocalized iso="FRA">Montant Remboursé</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_amount</Name>
+                <VariableLocalized iso="GER">Gesamtsumme</VariableLocalized>
+                <VariableLocalized iso="ENG">Total Sum</VariableLocalized>
+                <VariableLocalized iso="ITA">Somma Totale</VariableLocalized>
+                <VariableLocalized iso="FRA">Somme Totale</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_refund_date</Name>
+                <VariableLocalized iso="GER">Rückerstattungsdatum</VariableLocalized>
+                <VariableLocalized iso="ENG">Refund Date</VariableLocalized>
+                <VariableLocalized iso="ITA">Data di Rimborso</VariableLocalized>
+                <VariableLocalized iso="FRA">Date de Remboursement</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_total</Name>
+                <VariableLocalized iso="GER">Gesamt</VariableLocalized>
+                <VariableLocalized iso="ENG">Total</VariableLocalized>
+                <VariableLocalized iso="ITA">Totale</VariableLocalized>
+                <VariableLocalized iso="FRA">Total</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_no_refunds_info_text</Name>
+                <VariableLocalized iso="GER">Es wurden noch keine Rückerstattungen vorgenommen</VariableLocalized>
+                <VariableLocalized iso="ENG">No refunds have been made yet</VariableLocalized>
+                <VariableLocalized iso="ITA">Nessun rimborso è Stato Ancora Effettuato</VariableLocalized>
+                <VariableLocalized iso="FRA">Aucun Remboursement n'a Encore été Effectué</VariableLocalized>
+            </Variable>
+        </Locales>
+        <FrontendLink>
+            <Link>
+                <Filename>postfinancecheckout_webhook.php</Filename>
+                <Name>PostFinanceCheckout Webhook</Name>
+                <Template>empty.tpl</Template>
+                <VisibleAfterLogin>N</VisibleAfterLogin>
+                <PrintButton>N</PrintButton>
+                <SSL>2</SSL>
+                <LinkLanguage iso="GER">
+                    <Seo>postfinancecheckout-webhook</Seo>
+                    <Name>PostFinanceCheckout</Name>
+                    <Title>PostFinanceCheckout</Title>
+                    <MetaTitle>PostFinanceCheckout</MetaTitle>
+                    <MetaKeywords>PostFinanceCheckout</MetaKeywords>
+                    <MetaDescription>PostFinanceCheckout</MetaDescription>
+                </LinkLanguage>
+            </Link>
+            <Link>
+                <Filename>postfinancecheckout_failed_payment.php</Filename>
+                <Name>PostFinanceCheckout Payment Failed</Name>
+                <Template>empty.tpl</Template>
+                <VisibleAfterLogin>N</VisibleAfterLogin>
+                <PrintButton>N</PrintButton>
+                <SSL>2</SSL>
+                <LinkLanguage iso="ENG">
+                    <Seo>postfinancecheckout-failed-payment</Seo>
+                    <Name>PostFinanceCheckout Bezahlung fehlgeschlagen</Name>
+                    <Title>PostFinanceCheckout Bezahlung fehlgeschlagen</Title>
+                    <MetaTitle>PostFinanceCheckout Bezahlung fehlgeschlagen</MetaTitle>
+                    <MetaKeywords>PostFinanceCheckout Bezahlung fehlgeschlagen</MetaKeywords>
+                    <MetaDescription>PostFinanceCheckout Bezahlung fehlgeschlagen</MetaDescription>
+                </LinkLanguage>
+                <LinkLanguage iso="GER">
+                    <Seo>postfinancecheckout-bezahlung-fehlgeschlagen</Seo>
+                    <Name>PostFinanceCheckout Bezahlung fehlgeschlagen</Name>
+                    <Title>PostFinanceCheckout Bezahlung fehlgeschlagen</Title>
+                    <MetaTitle>PostFinanceCheckout Bezahlung fehlgeschlagen</MetaTitle>
+                    <MetaKeywords>PostFinanceCheckout Bezahlung fehlgeschlagen</MetaKeywords>
+                    <MetaDescription>PostFinanceCheckout Bezahlung fehlgeschlagen</MetaDescription>
+                </LinkLanguage>
+            </Link>
+            <Link>
+                <Filename>postfinancecheckout_thank_you_page.php</Filename>
+                <Name>PostFinanceCheckout Payment</Name>
+                <Template>postfinancecheckout_thank_you_page.tpl</Template>
+                <VisibleAfterLogin>N</VisibleAfterLogin>
+                <PrintButton>N</PrintButton>
+                <SSL>2</SSL>
+                <LinkLanguage iso="ENG">
+                    <Seo>postfinancecheckout-thank-you-page</Seo>
+                    <Name>PostFinanceCheckout Payment</Name>
+                    <Title>PostFinanceCheckout Payment</Title>
+                    <MetaTitle>PostFinanceCheckout Payment</MetaTitle>
+                    <MetaKeywords>PostFinanceCheckout Payment</MetaKeywords>
+                    <MetaDescription>PostFinanceCheckout Payment</MetaDescription>
+                </LinkLanguage>
+                <LinkLanguage iso="GER">
+                    <Seo>postfinancecheckout-danke-seite</Seo>
+                    <Name>PostFinanceCheckout Zahlungsart</Name>
+                    <Title>PostFinanceCheckout Zahlungsart</Title>
+                    <MetaTitle>PostFinanceCheckout Zahlungsart</MetaTitle>
+                    <MetaKeywords>PostFinanceCheckout Zahlungsart</MetaKeywords>
+                    <MetaDescription>PostFinanceCheckout Zahlungsart</MetaDescription>
+                </LinkLanguage>
+            </Link>
+            <Link>
+                <Filename>postfinancecheckout_iframe.php</Filename>
+                <Name>PostFinanceCheckout Payment method</Name>
+                <Template>postfinancecheckout_iframe.tpl</Template>
+                <VisibleAfterLogin>N</VisibleAfterLogin>
+                <PrintButton>N</PrintButton>
+                <SSL>2</SSL>
+                <LinkLanguage iso="ENG">
+                    <Seo>postfinancecheckout-payment-page</Seo>
+                    <Name>PostFinanceCheckout Payment</Name>
+                    <Title>PostFinanceCheckout Payment</Title>
+                    <MetaTitle>PostFinanceCheckout Payment</MetaTitle>
+                    <MetaKeywords>PostFinanceCheckout Payment</MetaKeywords>
+                    <MetaDescription>PostFinanceCheckout Payment</MetaDescription>
+                </LinkLanguage>
+                <LinkLanguage iso="GER">
+                    <Seo>postfinancecheckout-zahlungsseite</Seo>
+                    <Name>PostFinanceCheckout Zahlungsart</Name>
+                    <Title>PostFinanceCheckout Zahlungsart</Title>
+                    <MetaTitle>PostFinanceCheckout Zahlungsart</MetaTitle>
+                    <MetaKeywords>PostFinanceCheckout Zahlungsart</MetaKeywords>
+                    <MetaDescription>PostFinanceCheckout Zahlungsart</MetaDescription>
+                </LinkLanguage>
+            </Link>
+        </FrontendLink>
+        <Adminmenu>
+            <Settingslink sort="3">
+                <Setting type="text" initialValue="" sort="0" conf="N">
+                    <Name>Settings</Name>
+                    <ValueName>Settings</ValueName>
+                    <Description></Description>
+                </Setting>
+                <Name>Plugin Configuration</Name>
+                <Setting type="text" initialValue="" sort="1" conf="Y">
+                    <Name>User ID</Name>
+                    <Description>User ID Description</Description>
+                    <ValueName>jtl_postfinancecheckout_user_id</ValueName>
+                </Setting>
+
+                <Setting type="text" initialValue="" sort="2" conf="Y">
+                    <Name>Space ID</Name>
+                    <Description>Space ID Description</Description>
+                    <ValueName>jtl_postfinancecheckout_space_id</ValueName>
+                </Setting>
+
+                <Setting type="text" initialValue="" sort="3" conf="Y">
+                    <Name>Application Key ID</Name>
+                    <Description>Application Key Description</Description>
+                    <ValueName>jtl_postfinancecheckout_application_key</ValueName>
+                </Setting>
+
+                <Setting type="text" initialValue="" sort="4" conf="Y">
+                    <Name>Space View ID</Name>
+                    <Description>Space View ID Description</Description>
+                    <ValueName>jtl_postfinancecheckout_space_view_id</ValueName>
+                </Setting>
+
+                <Setting type="selectbox" initialValue="YES" sort="5" conf="Y">
+                    <Name>Send Confirmation Email</Name>
+                    <ValueName>jtl_postfinancecheckout_send_confirmation_email</ValueName>
+                    <SelectboxOptions>
+                        <Option value="YES" sort="0">Yes</Option>
+                        <Option value="NO" sort="1">No</Option>
+                    </SelectboxOptions>
+                </Setting>
+            </Settingslink>
+            <Customlink sort="1">
+                <Name>Orders</Name>
+            </Customlink>
+        </Adminmenu>
+    </Install>
+</jtlshopplugin>
