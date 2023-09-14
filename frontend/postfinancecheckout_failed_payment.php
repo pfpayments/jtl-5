@@ -33,11 +33,15 @@ if ($cartItems) {
 	restoreCart($cartItems);
 }
 
-$translations = PostFinanceCheckoutHelper::getTranslations($this->plugin->getLocalization(), [
+$translations = PostFinanceCheckoutHelper::getTranslations($plugin->getLocalization(), [
   'jtl_postfinancecheckout_payment_not_available_by_country_or_currency',
 ]);
 
 $errorMessage = $transaction->getUserFailureMessage() ?? $translations['jtl_postfinancecheckout_payment_not_available_by_country_or_currency'];
+if (str_contains(strtolower($errorMessage), 'timeout')) {
+	unset($_SESSION['transactionId']);
+	unset($_SESSION['arrayOfPossibleMethods']);
+}
 $alertHelper = Shop::Container()->getAlertService();
 $alertHelper->addAlert(Alert::TYPE_ERROR, $errorMessage, 'display error on payment page', ['saveInSession' => true]);
 

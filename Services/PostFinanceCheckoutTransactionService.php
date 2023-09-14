@@ -76,18 +76,16 @@ class PostFinanceCheckoutTransactionService
 		
 		$billingAddress = $this->createBillingAddress();
 		$shippingAddress = $this->createShippingAddress();
-
+		
 		$transactionPayload = new TransactionCreate();
 		$transactionPayload->setCurrency($_SESSION['cWaehrungName']);
 		$transactionPayload->setLanguage(PostFinanceCheckoutHelper::getLanguageString());
 		$transactionPayload->setLineItems($lineItems);
 		$transactionPayload->setBillingAddress($billingAddress);
 		$transactionPayload->setShippingAddress($shippingAddress);
-		$transactionPayload->setMerchantReference($order->cBestellNr);
 		
 		
 		$transactionPayload->setMetaData([
-		  'orderId' => $order->kBestellung,
 		  'spaceId' => $this->spaceId,
 		]);
 		
@@ -98,7 +96,7 @@ class PostFinanceCheckoutTransactionService
 		
 		$successUrl = Shop::getURL() . '/' . PostFinanceCheckoutHelper::PLUGIN_CUSTOM_PAGES['thank-you-page'][$_SESSION['cISOSprache']];
 		$failedUrl = Shop::getURL() . '/' . PostFinanceCheckoutHelper::PLUGIN_CUSTOM_PAGES['fail-page'][$_SESSION['cISOSprache']];
-
+		
 		$transactionPayload->setSuccessUrl($successUrl);
 		$transactionPayload->setFailedUrl($failedUrl);
 		$createdTransaction = $this->apiClient->getTransactionService()->create($this->spaceId, $transactionPayload);
@@ -113,12 +111,46 @@ class PostFinanceCheckoutTransactionService
 	 */
 	public function confirmTransaction(Transaction $transaction): void
 	{
+		$transactionId = $transaction->getId();
 		$pendingTransaction = new TransactionPending();
-		$pendingTransaction->setId($transaction->getId());
+		$pendingTransaction->setId($transactionId);
 		$pendingTransaction->setVersion($transaction->getVersion());
+		
+		$pendingTransaction->setMetaData([
+		  'orderId' => $_SESSION['kBestellung'],
+		  'spaceId' => $this->spaceId,
+		]);
+		
+		$pendingTransaction->setMerchantReference($_SESSION['BestellNr']);
 		
 		$this->apiClient->getTransactionService()
 		  ->confirm($this->spaceId, $pendingTransaction);
+		
+		$this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId);
+		unset($_SESSION['transactionId']);
+	}
+	
+	/**
+	 * @param Transaction $transaction
+	 * @return void
+	 */
+	public function updateTransaction(int $transactionId): void
+	{
+		$pendingTransaction = new TransactionPending();
+		$pendingTransaction->setId($transactionId);
+		
+		$transaction = $this->getTransactionFromPortal($transactionId);
+		$pendingTransaction->setVersion($transaction->getVersion());
+		
+		$billingAddress = $this->createBillingAddress();
+		$shippingAddress = $this->createShippingAddress();
+		
+		$pendingTransaction->setCurrency($_SESSION['cWaehrungName']);
+		$pendingTransaction->setBillingAddress($billingAddress);
+		$pendingTransaction->setShippingAddress($shippingAddress);
+		
+		$this->apiClient->getTransactionService()
+		  ->update($this->spaceId, $pendingTransaction);
 	}
 	
 	/**
@@ -186,6 +218,12 @@ class PostFinanceCheckoutTransactionService
 		return $this->apiClient
 		  ->getTransactionInvoiceService()
 		  ->read($this->spaceId, $transactionId);
+	}
+	
+	public function fetchPossiblePaymentMethods(string $transactionId)
+	{
+		return $this->apiClient->getTransactionService()
+		  ->fetchPaymentMethods($this->spaceId, $transactionId, 'iframe');
 	}
 	
 	public function updateTransactionStatus($transactionId, $newStatus)
@@ -259,7 +297,8 @@ class PostFinanceCheckoutTransactionService
 	private function createLineItemProductItem(CartItem $productData): LineItemCreate
 	{
 		$lineItem = new LineItemCreate();
-		$lineItem->setName($productData->cName);
+		$name = \is_array($productData->cName) ? $productData->cName[$_SESSION['cISOSprache']] : $productData->cName;
+		$lineItem->setName($name);
 		$lineItem->setUniqueId($productData->cArtNr);
 		$lineItem->setSku($productData->cArtNr);
 		$lineItem->setQuantity($productData->nAnzahl);
@@ -278,9 +317,10 @@ class PostFinanceCheckoutTransactionService
 	private function createLineItemShippingItem(CartItem $productData): LineItemCreate
 	{
 		$lineItem = new LineItemCreate();
-		$lineItem->setName('Shipping: ' . $productData->cName);
-		$lineItem->setUniqueId('shipping: ' . $productData->cName);
-		$lineItem->setSku('shipping: ' . $productData->cName);
+		$name = \is_array($productData->cName) ? $productData->cName[$_SESSION['cISOSprache']] : $productData->cName;
+		$lineItem->setName('Shipping: ' . $name);
+		$lineItem->setUniqueId('shipping: ' . $name);
+		$lineItem->setSku('shipping: ' . $name);
 		$lineItem->setQuantity(1);
 		preg_match_all('!\d+!', $productData->cGesamtpreisLocalized[0][$_SESSION['cWaehrungName']], $price);
 		$priceDecimal = number_format(floatval(($price[0][0] . '.' . $price[0][1])), 2);
@@ -296,8 +336,9 @@ class PostFinanceCheckoutTransactionService
 	private function createBillingAddress(): AddressCreate
 	{
 		$customer = $_SESSION['Kunde'];
-		
+
 		$billingAddress = new AddressCreate();
+		$billingAddress->setStreet($customer->cStrasse);
 		$billingAddress->setCity($customer->cOrt);
 		$billingAddress->setCountry($customer->cLand);
 		$billingAddress->setEmailAddress($customer->cMail);
@@ -320,6 +361,7 @@ class PostFinanceCheckoutTransactionService
 		$customer = $_SESSION['Lieferadresse'];
 		
 		$shippingAddress = new AddressCreate();
+		$shippingAddress->setStreet($customer->cStrasse);
 		$shippingAddress->setCity($customer->cOrt);
 		$shippingAddress->setCountry($customer->cLand);
 		$shippingAddress->setEmailAddress($customer->cMail);
@@ -352,6 +394,28 @@ class PostFinanceCheckoutTransactionService
 		$newTransaction->created_at = date('Y-m-d H:i:s');
 		
 		Shop::Container()->getDB()->insert('postfinancecheckout_transactions', $newTransaction);
+	}
+	
+	/**
+	 * @param string $transactionId
+	 * @param array $orderData
+	 * @return void
+	 */
+	private function updateLocalPostFinanceCheckoutTransaction(string $transactionId): void
+	{
+		Shop::Container()
+		  ->getDB()->update(
+			'postfinancecheckout_transactions',
+			['transaction_id'],
+			[$transactionId],
+			(object)[
+			  'state' => TransactionState::PROCESSING,
+			  'payment_method' => $_SESSION['Zahlungsart']->cName,
+			  'order_id' => $_SESSION['kBestellung'],
+			  'space_id' => $this->spaceId,
+			  'created_at' => date('Y-m-d H:i:s')
+			]
+		  );
 	}
 }
 

@@ -11,7 +11,6 @@ use JTL\phpQuery\phpQuery;
 use JTL\Plugin\Bootstrapper;
 use JTL\Shop;
 use JTL\Smarty\JTLSmarty;
-use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 use Plugin\jtl_paypal\paymentmethod\PendingPayment;
 use Plugin\jtl_postfinancecheckout\adminmenu\AdminTabProvider;
 use Plugin\jtl_postfinancecheckout\frontend\Handler as FrontendHandler;
@@ -48,11 +47,16 @@ class Bootstrap extends Bootstrapper
 					return;
 				}
 				
-				$createdTransactionId = $handler->createAndConfirmTransaction($args['oBestellung']);
-				$redirectUrl = $handler->getRedirectUrlAfterCreatedTransaction($createdTransactionId, $args['oBestellung']);
+				$redirectUrl = $handler->getRedirectUrlAfterCreatedTransaction($args['oBestellung']);
 				
 				header("Location: " . $redirectUrl);
 				exit;
+			});
+			
+			$dispatcher->listen('shop.hook.' . \HOOK_BESTELLVORGANG_PAGE_STEPZAHLUNG, function () use ($handler) {
+				$smarty = Shop::Smarty();
+				$paymentMethods = $handler->getPaymentMethodsForForm($smarty);
+				$smarty->assign('Zahlungsarten', $paymentMethods);
 			});
 		} else {
 			$dispatcher->listen('shop.hook.' . \HOOK_PLUGIN_SAVE_OPTIONS, function () use ($plugin) {
