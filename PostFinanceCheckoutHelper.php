@@ -14,6 +14,7 @@ use JTL\Plugin\Helper as PluginHelper;
  */
 class PostFinanceCheckoutHelper extends Helper
 {
+	const PAYMENT_METHOD_PREFIX = 'postfinancecheckout_payment';
 	const USER_ID = 'jtl_postfinancecheckout_user_id';
 	const SPACE_ID = 'jtl_postfinancecheckout_space_id';
 	const APPLICATION_KEY = 'jtl_postfinancecheckout_application_key';

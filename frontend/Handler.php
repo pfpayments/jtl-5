@@ -87,7 +87,7 @@ final class Handler
 			$possiblePaymentMethods = $this->fetchPossiblePaymentMethods((string)$createdTransactionId);
 			$arrayOfPossibleMethods = [];
 			foreach ($possiblePaymentMethods as $possiblePaymentMethod) {
-				$arrayOfPossibleMethods[] = PostFinanceCheckoutHelper::slugify($possiblePaymentMethod->getName(), '-');
+				$arrayOfPossibleMethods[] = PostFinanceCheckoutHelper::PAYMENT_METHOD_PREFIX . '_' . $possiblePaymentMethod->getId();
 			}
 			$_SESSION['arrayOfPossibleMethods'] = $arrayOfPossibleMethods;
 		}
@@ -97,8 +97,8 @@ final class Handler
 			if (empty($paymentMethod->cAnbieter) || strtolower($paymentMethod->cAnbieter) !== 'postfinancecheckout') {
 				continue;
 			}
-			$slug = PostFinanceCheckoutHelper::slugify($paymentMethod->cName, '-');
-			if (!\in_array($slug, $arrayOfPossibleMethods, true)) {
+
+			if (!\in_array($paymentMethod->cModulId, $arrayOfPossibleMethods, true)) {
 				unset($paymentMethods[$key]);
 			}
 		}
@@ -132,7 +132,7 @@ final class Handler
 		
 		// TODO create setting with options ['payment_page', 'iframe'];
 		$integration = 'iframe';
-		$_SESSION['transactionID'] = $createdTransactionId;
+		$_SESSION['transactionId'] = $createdTransactionId;
 		
 		if ($integration == 'payment_page') {
 			$redirectUrl = $this->apiClient->getTransactionPaymentPageService()

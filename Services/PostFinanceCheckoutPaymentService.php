@@ -272,8 +272,7 @@ class PostFinanceCheckoutPaymentService
 		 * PaymentMethodConfiguration $paymentMethod
 		 */
 		foreach ($paymentMethods as $paymentMethod) {
-			$name = 'PostFinanceCheckout ' . $paymentMethod->getName();
-			$slug = trim(strtolower(PostFinanceCheckoutHelper::slugify($name)));
+			$slug = PostFinanceCheckoutHelper::PAYMENT_METHOD_PREFIX . '_' . $paymentMethod->getId();
 			$paymentMethodsFromPortal[] = $slug;
 			
 			if (!in_array($slug, $installedPaymentMethodsIds, true)) {
