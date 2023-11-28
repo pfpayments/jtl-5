@@ -2,7 +2,7 @@
 
 namespace Plugin\jtl_postfinancecheckout\Webhooks\Strategies\Interfaces;
 
-interface WhiteLabelMachineOrderUpdateStrategyInterface
+interface PostFinanceCheckoutOrderUpdateStrategyInterface
 {
 	public function updateOrderStatus(string $entityId): void;
 }

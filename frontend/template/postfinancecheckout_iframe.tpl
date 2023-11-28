@@ -31,11 +31,11 @@
                     form="confirmOrderForm"
                     disabled
                     type="submit">
-                Pay
+                {$translations.jtl_wallee_pay}
             </button>
             <button style="visibility: hidden" type="button"
                     class="btn btn-outline-primary header-minimal-back-to-shop-button"
-                    id="postfinancecheckoutOrderCancel">Cancel
+                    id="postfinancecheckoutOrderCancel">{$translations.jtl_wallee_cancel}
             </button>
         </form>
     </div>
@@ -45,4 +45,5 @@
 <script src="{$appJsUrl}"></script>
 <script>
     $('head').append('<link rel="stylesheet" type="text/css" href="{$mainCssUrl}">');
+    $("#header-top-bar > div > ul").hide();
 </script>

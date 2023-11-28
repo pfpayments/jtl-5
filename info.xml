@@ -9,9 +9,23 @@
     <Icon>logo.jpg</Icon>
     <PluginID>jtl_postfinancecheckout</PluginID>
     <CreateDate>2023-05-29</CreateDate>
-    <Version>1.0.0</Version>
+    <Version>1.0.5</Version>
     <Install>
         <Locales>
+            <Variable>
+                <Name>jtl_postfinancecheckout_cancel</Name>
+                <VariableLocalized iso="GER">Stornieren</VariableLocalized>
+                <VariableLocalized iso="ENG">Cancel</VariableLocalized>
+                <VariableLocalized iso="ITA">Annullare</VariableLocalized>
+                <VariableLocalized iso="FRA">Annuler</VariableLocalized>
+            </Variable>
+            <Variable>
+                <Name>jtl_postfinancecheckout_pay</Name>
+                <VariableLocalized iso="GER">Bezahlen</VariableLocalized>
+                <VariableLocalized iso="ENG">Pay</VariableLocalized>
+                <VariableLocalized iso="ITA">Pagare</VariableLocalized>
+                <VariableLocalized iso="FRA">Payer</VariableLocalized>
+            </Variable>
             <Variable>
                 <Name>jtl_postfinancecheckout_payment_not_available_by_country_or_currency</Name>
                 <VariableLocalized iso="GER">Die Zahlung ist für dieses Land oder diese Währung nicht möglich. Bitte verwenden Sie eine andere</VariableLocalized>
@@ -147,10 +161,10 @@
             </Variable>
             <Variable>
                 <Name>jtl_postfinancecheckout_transaction_no_possible_actions</Name>
-                <VariableLocalized iso="GER">Für diese Transaktion sind keine Aktionen möglich, da der aktuelle Status lautet</VariableLocalized>
-                <VariableLocalized iso="ENG">No possible actions for this transaction, because current state is</VariableLocalized>
-                <VariableLocalized iso="ITA">Nessuna azione possibile per questa transazione perché lo stato attuale lo è</VariableLocalized>
-                <VariableLocalized iso="FRA">Aucune action possible pour cette transaction, car l'état actuel est</VariableLocalized>
+                <VariableLocalized iso="GER">Für diese Transaktion sind keine Aktionen möglich</VariableLocalized>
+                <VariableLocalized iso="ENG">No possible actions for this transaction</VariableLocalized>
+                <VariableLocalized iso="ITA">Nessuna azione possibile per questa transazione</VariableLocalized>
+                <VariableLocalized iso="FRA">Aucune action possible pour cette transaction</VariableLocalized>
             </Variable>
             <Variable>
                 <Name>jtl_postfinancecheckout_complete</Name>
@@ -158,13 +172,6 @@
                 <VariableLocalized iso="ENG">Complete</VariableLocalized>
                 <VariableLocalized iso="ITA">Completare</VariableLocalized>
                 <VariableLocalized iso="FRA">Complet</VariableLocalized>
-            </Variable>
-            <Variable>
-                <Name>jtl_postfinancecheckout_cancel</Name>
-                <VariableLocalized iso="GER">Stornieren</VariableLocalized>
-                <VariableLocalized iso="ENG">Cancel</VariableLocalized>
-                <VariableLocalized iso="ITA">Annulla</VariableLocalized>
-                <VariableLocalized iso="FRA">Annuler</VariableLocalized>
             </Variable>
             <Variable>
                 <Name>jtl_postfinancecheckout_refunds</Name>

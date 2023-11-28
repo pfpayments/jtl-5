@@ -22,6 +22,8 @@ use JTL\Plugin\Helper as PluginHelper;
  */
 class PostFinanceCheckoutPaymentService
 {
+	const STATUS_DISABLED = 0;
+	const STATUS_ENABLED = 1;
 	const TABLE_NAME_PAYMENT_METHODS = 'tzahlungsart';
 	const TABLE_NAME_PAYMENT_METHOD_LANG = 'tzahlungsartsprache';
 	const TABLE_NAME_PAYMENT_METHOD_CLASS = 'tpluginzahlungsartklasse';
@@ -61,12 +63,13 @@ class PostFinanceCheckoutPaymentService
 		
 		$entityQuery = (new EntityQuery())->setFilter($entityQueryFilter);
 		$apiClient = $this->apiClient;
+		$plugin = PluginHelper::getLoaderByPluginID($this->pluginId)->init($this->pluginId);
 		
 		$config = PostFinanceCheckoutHelper::getConfigByID($this->pluginId);
 		$spaceId = $config[PostFinanceCheckoutHelper::SPACE_ID];
 		
 		if (empty($spaceId)) {
-			$translations = PostFinanceCheckoutHelper::getTranslations($this->plugin->getLocalization(), [
+			$translations = PostFinanceCheckoutHelper::getTranslations($plugin->getLocalization(), [
 			  'jtl_postfinancecheckout_empty_space_id',
 			]);
 			Shop::Container()->getAlertService()->addDanger(
@@ -79,7 +82,7 @@ class PostFinanceCheckoutPaymentService
 		try {
 			$paymentMethodConfigurations = $apiClient->getPaymentMethodConfigurationService()->search($spaceId, $entityQuery);
 		} catch (\Exception $exception) {
-			$translations = PostFinanceCheckoutHelper::getTranslations($this->plugin->getLocalization(), [
+			$translations = PostFinanceCheckoutHelper::getTranslations($plugin->getLocalization(), [
 			  'jtl_postfinancecheckout_cant_fetch_payment_methods',
 			]);
 			Shop::Container()->getAlertService()->addDanger(
@@ -180,11 +183,11 @@ class PostFinanceCheckoutPaymentService
 		  ->insert(self::TABLE_NAME_PAYMENT_METHOD_CLASS, $paymentClass);
 	}
 	
-	public function getInstalledPaymentMethods(): array
+	public function getInstalledPaymentMethods(int $status = self::STATUS_ENABLED): array
 	{
 		$objects = Shop::Container()
 		  ->getDB()
-		  ->selectAll(self::TABLE_NAME_PAYMENT_METHODS, 'nActive', 1);
+		  ->selectAll(self::TABLE_NAME_PAYMENT_METHODS, 'nActive', $status);
 		
 		$filteredObjects = array_filter($objects, function ($object) {
 			return stripos($object->cAnbieter, 'PostFinanceCheckout') !== false;
@@ -251,6 +254,30 @@ class PostFinanceCheckoutPaymentService
 		}
 	}
 	
+	/**
+	 * @param $status
+	 * @return void
+	 */
+	public function updatePaymentMethodStatus($status = self::STATUS_ENABLED): void
+	{
+		$paymentMethodsToEnableIds = [];
+		$paymentMethodsIds = $this->getInstalledPaymentMethods($status === self::STATUS_ENABLED ? self::STATUS_DISABLED : self::STATUS_ENABLED);
+		foreach ($paymentMethodsIds as $paymentMethodId) {
+			$method = new stdClass();
+			$method->nActive = $status;
+			Shop::Container()->getDB()->update(self::TABLE_NAME_PAYMENT_METHODS, 'cModulId', $paymentMethodId, $method);
+			$check = Shop::Container()->getDB()->selectAll(self::TABLE_NAME_PAYMENT_METHODS, 'cModulId', $paymentMethodId);
+			$paymentMethodsToEnableIds[] = ($check[0])->kZahlungsart;
+			
+			if ($status === self::STATUS_DISABLED) {
+				Shop::Container()->getDB()->delete(self::TABLE_NAME_SHIPPING_PAYMENT, 'kZahlungsart', ($check[0])->kZahlungsart);
+			}
+		}
+		if ($status === self::STATUS_ENABLED) {
+			$this->enablePaymentMethods($paymentMethodsToEnableIds);
+		}
+	}
+	
 	public function syncPaymentMethods()
 	{
 		if (!$this->apiClient) {
@@ -265,7 +292,7 @@ class PostFinanceCheckoutPaymentService
 		
 		$translations = [];
 		
-		$installedPaymentMethodsIds = $this->getInstalledPaymentMethods();
+		$installedPaymentMethodsIds = $this->getInstalledPaymentMethods(self::STATUS_ENABLED);
 		$paymentMethodsFromPortal = [];
 		$i = 0;
 		/**

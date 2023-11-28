@@ -79,7 +79,7 @@
             <h2>{$translations.jtl_postfinancecheckout_refunded_amount} {$totalRefundsAmountText} / {$totalAmountText}</h2>
 
             {if $refunds|@count > 0 && $refunds}
-                <table id="refunds-details-table">
+                <table class="table table-striped" id="refunds-details-table">
                     <thead>
                     <tr>
                         <th class="text-right">
@@ -103,6 +103,7 @@
                         </th>
                     </tr>
                     </thead>
+
                     <tbody>
                     {foreach $refunds as $key => $refund}
                         <tr>

@@ -42,7 +42,7 @@ account dashboard.
 
 ## Documentation
 
-[Documentation](https://plugin-documentation.postfinance-checkout.ch/pfpayments/jtl-5/1.0.4/docs/en/documentation.html)
+[Documentation](https://plugin-documentation.postfinance-checkout.ch/pfpayments/jtl-5/1.0.5/docs/en/documentation.html)
 
 ## License
 

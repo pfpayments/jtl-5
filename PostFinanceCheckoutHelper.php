@@ -20,12 +20,12 @@ class PostFinanceCheckoutHelper extends Helper
 	const APPLICATION_KEY = 'jtl_postfinancecheckout_application_key';
 	const SPACE_VIEW_ID = 'jtl_postfinancecheckout_space_view_id';
 	const SEND_CONFIRMATION_EMAIL = 'jtl_postfinancecheckout_send_confirmation_email';
-	
+
 	const PAYMENT_METHOD_CONFIGURATION = 'PaymentMethodConfiguration';
 	const REFUND = 'Refund';
 	const TRANSACTION = 'Transaction';
 	const TRANSACTION_INVOICE = 'TransactionInvoice';
-	
+
 	const PLUGIN_CUSTOM_PAGES = [
 	  'thank-you-page' => [
 		'ger' => 'postfinancecheckout-danke-seite',
@@ -40,8 +40,8 @@ class PostFinanceCheckoutHelper extends Helper
 		'eng' => 'postfinancecheckout-failed-payment'
 	  ],
 	];
-	
-	
+
+
 	/**
 	 * @param string $text
 	 * @param string $divider
@@ -51,83 +51,89 @@ class PostFinanceCheckoutHelper extends Helper
 	{
 		// replace non letter or digits by divider
 		$text = preg_replace('~[^\pL\d]+~u', $divider, $text);
-		
+
 		// transliterate
 		$text = iconv('utf-8', 'us-ascii//TRANSLIT', $text);
-		
+
 		// remove unwanted characters
 		$text = preg_replace('~[^-\w]+~', '', $text);
-		
+
 		// trim
 		$text = trim($text, $divider);
-		
+
 		// remove duplicate divider
 		$text = preg_replace('~-+~', $divider, $text);
-		
+
 		// lowercase
 		$text = strtolower($text);
-		
+
 		return $text;
 	}
-	
+
 	/**
 	 * @return string
 	 */
 	public static function getLanguageString(): string
 	{
-		switch ($_SESSION['currentLanguage']->localizedName) {
-			case 'de':
+		switch ($_SESSION['currentLanguage']->iso) {
+			case 'ger':
 				return 'de_DE';
-			
-			case 'fr':
+
+			case 'fra':
 				return 'fr_FR';
-			
-			case 'it':
+
+			case 'ita':
 				return 'it_IT';
-			
+
 			default:
 				return 'en_GB';
 		}
 	}
-	
+
 	/**
+	 * @param $isAdmin
 	 * @return string
 	 */
-	public static function getLanguageIso(): string
+	public static function getLanguageIso($isAdmin = true): string
 	{
+		if (!$isAdmin) {
+			return $_SESSION['cISOSprache'];
+		}
+
 		$gettext = Shop::Container()->getGetText();
 		$langTag = $_SESSION['AdminAccount']->language ?? $gettext->getLanguage();
-		
+
 		switch (substr($langTag, 0, 2)) {
 			case 'de':
 				return 'ger';
-			
+
 			case 'en':
 				return 'eng';
-			
+
 			case 'fr':
 				return 'fra';
-			
+
 			case 'it':
 				return 'ita';
 		}
 	}
-	
+
 	/**
 	 * @param Localization $localization
 	 * @param array $keys
+	 * @param $isAdmin
 	 * @return array
 	 */
-	public static function getTranslations(Localization $localization, array $keys): array
+	public static function getTranslations(Localization $localization, array $keys, $isAdmin = true): array
 	{
 		$translations = [];
 		foreach ($keys as $key) {
-			$translations[$key] = $localization->getTranslation($key, self::getLanguageIso());
+			$translations[$key] = $localization->getTranslation($key, self::getLanguageIso($isAdmin));
 		}
-		
+
 		return $translations;
 	}
-	
+
 	/**
 	 * @param Localization $localization
 	 * @return array
@@ -142,7 +148,7 @@ class PostFinanceCheckoutHelper extends Helper
 		  'jtl_postfinancecheckout_order_status_shipped',
 		  'jtl_postfinancecheckout_order_status_partially_shipped',
 		]);
-		
+
 		return [
 		  '-1' => $translations['jtl_postfinancecheckout_order_status_cancelled'],
 		  '1' => $translations['jtl_postfinancecheckout_order_status_open'],
@@ -152,7 +158,7 @@ class PostFinanceCheckoutHelper extends Helper
 		  '5' => $translations['jtl_postfinancecheckout_order_status_partially_shipped'],
 		];
 	}
-	
+
 	/**
 	 * @param int $pluginId
 	 * @return ApiClient|null
@@ -163,7 +169,7 @@ class PostFinanceCheckoutHelper extends Helper
 			$apiClient = new PostFinanceCheckoutApiClient($pluginId);
 			return $apiClient->getApiClient();
 		} else {
-			
+
 			if (isset($_POST['Setting'])) {
 				$plugin = PluginHelper::getLoaderByPluginID($pluginId)->init($pluginId);
 				$translations = PostFinanceCheckoutHelper::getTranslations($plugin->getLocalization(), [

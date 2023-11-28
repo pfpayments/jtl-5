@@ -2,29 +2,29 @@
 
 namespace Plugin\jtl_postfinancecheckout\Webhooks;
 
-use Plugin\jtl_postfinancecheckout\Webhooks\Strategies\Interfaces\WhiteLabelMachineOrderUpdateStrategyInterface;
+use Plugin\jtl_postfinancecheckout\Webhooks\Strategies\Interfaces\PostFinanceCheckoutOrderUpdateStrategyInterface;
 
 class PostFinanceCheckoutOrderUpdater
 {
 	/**
-	 * @var WhiteLabelMachineOrderUpdateStrategyInterface $strategy
+	 * @var PostFinanceCheckoutOrderUpdateStrategyInterface $strategy
 	 */
 	private $strategy;
-	
-	public function __construct(WhiteLabelMachineOrderUpdateStrategyInterface $strategy)
+
+	public function __construct(PostFinanceCheckoutOrderUpdateStrategyInterface $strategy)
 	{
 		$this->strategy = $strategy;
 	}
-	
+
 	/**
-	 * @param WhiteLabelMachineOrderUpdateStrategyInterface $strategy
+	 * @param PostFinanceCheckoutOrderUpdateStrategyInterface $strategy
 	 * @return void
 	 */
-	public function setStrategy(WhiteLabelMachineOrderUpdateStrategyInterface $strategy)
+	public function setStrategy(PostFinanceCheckoutOrderUpdateStrategyInterface $strategy)
 	{
 		$this->strategy = $strategy;
 	}
-	
+
 	/**
 	 * @param string $transactionId
 	 * @return void
