@@ -31,11 +31,11 @@
                     form="confirmOrderForm"
                     disabled
                     type="submit">
-                {$translations.jtl_wallee_pay}
+                {$translations.jtl_postfinancecheckout_pay}
             </button>
             <button style="visibility: hidden" type="button"
                     class="btn btn-outline-primary header-minimal-back-to-shop-button"
-                    id="postfinancecheckoutOrderCancel">{$translations.jtl_wallee_cancel}
+                    id="postfinancecheckoutOrderCancel">{$translations.jtl_postfinancecheckout_cancel}
             </button>
         </form>
     </div>
