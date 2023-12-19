@@ -10,6 +10,8 @@ use JTL\Smarty\JTLSmarty;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use PostFinanceCheckout\Sdk\ApiClient;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
+use JTL\Checkout\OrderHandler;
+use JTL\Session\Frontend;
 
 final class Handler
 {
@@ -198,6 +200,9 @@ final class Handler
                 if ($_SESSION['Zahlungsart']?->nWaehrendBestellung ?? null === 1) {
                     $smarty = $args['smarty'];
                     $order = $smarty->getTemplateVars('Bestellung');
+                    $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
+                    $orderHandler->finalizeOrder();
+
                     if (!empty($order)) {
                         $redirectUrl = $this->getRedirectUrlAfterCreatedTransaction($order);
                         header("Location: " . $redirectUrl);
