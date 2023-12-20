@@ -200,8 +200,6 @@ final class Handler
                 if ($_SESSION['Zahlungsart']?->nWaehrendBestellung ?? null === 1) {
                     $smarty = $args['smarty'];
                     $order = $smarty->getTemplateVars('Bestellung');
-                    $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
-                    $orderHandler->finalizeOrder();
 
                     if (!empty($order)) {
                         $redirectUrl = $this->getRedirectUrlAfterCreatedTransaction($order);

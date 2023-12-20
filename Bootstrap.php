@@ -125,10 +125,14 @@ class Bootstrap extends Bootstrapper
     {
         $dispatcher->listen('shop.hook.' . \HOOK_SMARTY_OUTPUTFILTER, [$handler, 'contentUpdate']);
         $dispatcher->listen('shop.hook.' . \HOOK_BESTELLABSCHLUSS_INC_BESTELLUNGINDB_ENDE, function ($args) use ($handler) {
-            if (isset($_SESSION['Zahlungsart']->cModulId) && str_contains(\strtolower($_SESSION['Zahlungsart']->cModulId), 'postfinancecheckout')) {
-                $redirectUrl = $handler->getRedirectUrlAfterCreatedTransaction($args['oBestellung']);
-                header("Location: " . $redirectUrl);
-                exit;
+            if (isset($_SESSION['finalize']) && $_SESSION['finalize'] === true) {
+                unset($_SESSION['finalize']);
+            } else {
+                if (isset($_SESSION['Zahlungsart']->cModulId) && str_contains(\strtolower($_SESSION['Zahlungsart']->cModulId), 'postfinancecheckout')) {
+                    $redirectUrl = $handler->getRedirectUrlAfterCreatedTransaction($args['oBestellung']);
+                    header("Location: " . $redirectUrl);
+                    exit;
+                }
             }
         });
 

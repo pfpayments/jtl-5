@@ -20,7 +20,7 @@ if ($transactionId) {
     $transaction = $transactionService->getTransactionFromPortal($transactionId);
     unset($_SESSION['transactionId']);
 
-    $errorMessage = $transaction->getUserFailureMessage();
+    $errorMessage = $transaction->getUserFailureMessage() ?? '';
     if (str_contains(strtolower($errorMessage), 'timeout')) {
         unset($_SESSION['transactionId']);
         unset($_SESSION['arrayOfPossibleMethods']);
