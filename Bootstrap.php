@@ -141,6 +141,10 @@ class Bootstrap extends Bootstrapper
             $paymentMethods = $handler->getPaymentMethodsForForm($smarty);
             $smarty->assign('Zahlungsarten', $paymentMethods);
         });
+
+        $dispatcher->listen('shop.hook.' . \HOOK_BESTELLUNGEN_XML_BESTELLSTATUS, function ($args) use ($handler) {
+            $handler->completeOrderAfterWawi($args);
+        });
     }
 
     /**

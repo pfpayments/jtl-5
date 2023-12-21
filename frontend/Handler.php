@@ -3,15 +3,17 @@
 namespace Plugin\jtl_postfinancecheckout\frontend;
 
 use JTL\Checkout\Bestellung;
+use JTL\Checkout\OrderHandler;
 use JTL\DB\DbInterface;
 use JTL\Plugin\PluginInterface;
+use JTL\Session\Frontend;
 use JTL\Shop;
 use JTL\Smarty\JTLSmarty;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
-use PostFinanceCheckout\Sdk\ApiClient;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
-use JTL\Checkout\OrderHandler;
-use JTL\Session\Frontend;
+use PostFinanceCheckout\Sdk\ApiClient;
+use PostFinanceCheckout\Sdk\Model\TransactionState;
+
 
 final class Handler
 {
@@ -50,7 +52,9 @@ final class Handler
         if (!$transactionId) {
             $order = new Bestellung();
             $order->Positionen = $_SESSION['Warenkorb']->PositionenArr;
-            $order->cBestellNr = rand(111111, 999999);
+
+            $randomString = substr(str_shuffle('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 16);
+            $order->cBestellNr = $randomString;
 
             $createdTransaction = $this->transactionService->createTransaction($order);
             $transactionId = $createdTransaction->getId();
@@ -112,7 +116,7 @@ final class Handler
                 $config = PostFinanceCheckoutHelper::getConfigByID($this->plugin->getId());
                 $spaceId = $config[PostFinanceCheckoutHelper::SPACE_ID];
                 $transaction = $this->apiClient->getTransactionService()->read($spaceId, $createdTransactionId);
-                if ($transaction->getState() === 'CONFIRMED') {
+                if ($transaction->getState() === TransactionState::CONFIRMED) {
                     $_SESSION['transactionId'] = null;
                     $createdTransactionId = $this->createTransaction();
                     $_SESSION['transactionId'] = $createdTransactionId;
@@ -131,6 +135,29 @@ final class Handler
                 $arrayOfPossibleMethods[] = PostFinanceCheckoutHelper::PAYMENT_METHOD_PREFIX . '_' . $possiblePaymentMethod->getId();
             }
             $_SESSION['arrayOfPossibleMethods'] = $arrayOfPossibleMethods;
+        }
+    }
+
+    /**
+     * @param array $args
+     * @return void
+     */
+    public function completeOrderAfterWawi(array $args): void
+    {
+        $order = $args['oBestellung'] ?? [];
+        if (!$order || (int)$args['status'] !== \BESTELLUNG_STATUS_BEZAHLT) {
+            return;
+        }
+
+        $obj = Shop::Container()->getDB()->selectSingleRow('postfinancecheckout_transactions', 'order_id', $order->kBestellung);
+        $transactionId = $obj->transaction_id ?? '';
+        if (empty($transactionId)) {
+            return;
+        }
+
+        $transaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
+        if ($transaction->state === TransactionState::AUTHORIZED) {
+            $this->transactionService->completePortalTransaction($transactionId);
         }
     }
 

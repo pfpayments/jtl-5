@@ -53,29 +53,17 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
         $transaction = $this->transactionService->getTransactionFromPortal($entityId);
         $transactionId = $transaction->getId();
 
-        $orderId = (int)$transaction->getMetaData()['orderId'];
+        $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
+        $orderId = (int)$localTransaction->order_id;
         $transactionState = $transaction->getState();
 
         switch ($transactionState) {
             case TransactionState::FULFILL:
                 $order = new Bestellung($orderId);
-                $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
-                if ($localTransaction->state !== TransactionState::FULFILL) {
-                    $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
-                    $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                    $paymentMethod = new Method($paymentMethodEntity->cModulId);
-                    $paymentMethod->setOrderStatusToPaid($order);
-                    $incomingPayment = new stdClass();
-
-                    $incomingPayment->fBetrag = $transaction->getAuthorizationAmount();
-                    $incomingPayment->cISO = $transaction->getCurrency();
-                    $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
-                    $paymentMethod->addIncomingPayment($order, $incomingPayment);
-                }
+                $this->transactionService->addIncommingPayment((string)$transactionId, $order, $transaction);
                 break;
 
             case TransactionState::PROCESSING:
-                $this->orderService->updateOrderStatus($orderId, \BESTELLUNG_STATUS_OFFEN, \BESTELLUNG_STATUS_IN_BEARBEITUNG);
                 $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
                 print 'Order ' . $orderId . ' status was updated to processing. Triggered by Transaction Invoice webhook.';
                 break;
@@ -91,7 +79,6 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
             case TransactionState::DECLINE:
             case TransactionState::VOIDED:
             case TransactionState::FAILED:
-
                 $order = new Bestellung($orderId);
                 $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
                 $paymentMethod = new Method($paymentMethodEntity->cModulId);

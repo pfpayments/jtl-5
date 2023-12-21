@@ -38,8 +38,9 @@ class PostFinanceCheckoutNameOrderUpdateTransactionInvoiceStrategy implements Po
             ->getLineItemVersion()
             ->getTransaction();
 
-        $orderId = (int)$transaction->getMetaData()['orderId'];
         $transactionId = $transaction->getId();
+        $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
+        $orderId = (int)$localTransaction->order_id;
 
         switch ($transactionInvoice->getState()) {
             case TransactionInvoiceState::DERECOGNIZED:
@@ -55,19 +56,7 @@ class PostFinanceCheckoutNameOrderUpdateTransactionInvoiceStrategy implements Po
                 }
 
                 $order = new Bestellung($orderId);
-                $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
-                if ($localTransaction->state !== TransactionState::FULFILL) {
-                    $this->transactionService->updateTransactionStatus($transactionId, TransactionState::FULFILL);
-                    $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                    $paymentMethod = new Method($paymentMethodEntity->cModulId);
-                    $paymentMethod->setOrderStatusToPaid($order);
-                    $incomingPayment = new stdClass();
-
-                    $incomingPayment->fBetrag = $transaction->getAuthorizationAmount();
-                    $incomingPayment->cISO = $transaction->getCurrency();
-                    $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
-                    $paymentMethod->addIncomingPayment($order, $incomingPayment);
-                }
+                $this->transactionService->addIncommingPayment((string)$transactionId, $order, $transaction);
                 print 'Order ' . $orderId . ' status was updated to paid. Triggered by Transaction Invoice webhook.';
                 break;
         }
