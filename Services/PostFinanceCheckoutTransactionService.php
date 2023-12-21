@@ -21,7 +21,8 @@ use PostFinanceCheckout\Sdk\Model\{AddressCreate,
     TransactionCreate,
     TransactionInvoice,
     TransactionPending,
-    TransactionState};
+    TransactionState
+};
 
 class PostFinanceCheckoutTransactionService
 {
@@ -79,6 +80,12 @@ class PostFinanceCheckoutTransactionService
         $transactionPayload->setFailedUrl($failedUrl);
         $createdTransaction = $this->apiClient->getTransactionService()->create($this->spaceId, $transactionPayload);
 
+        $obj = Shop::Container()->getDB()->selectSingleRow('tzahlungsart', 'kZahlungsart', (int)$_SESSION['AktiveZahlungsart']);
+        $createOrderBeforePayment = (int)$obj->nWaehrendBestellung ?? 0;
+        if ($createOrderBeforePayment === 1) {
+            $this->createLocalPostFinanceCheckoutTransaction((string)$createdTransaction->getId(), (array)$order);
+        }
+
         return $createdTransaction;
     }
 
@@ -100,8 +107,8 @@ class PostFinanceCheckoutTransactionService
 
         $orderId = $_SESSION['kBestellung'];
         $orderNr = $_SESSION['BestellNr'];
-        $obj = Shop::Container()->getDB()->selectSingleRow('tzahlungsart', 'kZahlungsart', (int)$_SESSION['AktiveZahlungsart']);
 
+        $obj = Shop::Container()->getDB()->selectSingleRow('tzahlungsart', 'kZahlungsart', (int)$_SESSION['AktiveZahlungsart']);
         $createOrderBeforePayment = (int)$obj->nWaehrendBestellung ?? 0;
         if ($createOrderBeforePayment === 1) {
             $orderId = null;
@@ -122,7 +129,9 @@ class PostFinanceCheckoutTransactionService
         $this->apiClient->getTransactionService()
             ->confirm($this->spaceId, $pendingTransaction);
 
-        $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId);
+        if ($createOrderBeforePayment === 1) {
+            $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId);
+        }
     }
 
     /**
@@ -220,13 +229,14 @@ class PostFinanceCheckoutTransactionService
 
     public function updateTransactionStatus($transactionId, $newStatus)
     {
-        return Shop::Container()
+        $updated = Shop::Container()
             ->getDB()->update(
                 'postfinancecheckout_transactions',
                 ['transaction_id'],
                 [$transactionId],
                 (object)['state' => $newStatus]
             );
+        print 'Updated ' . $updated;
     }
 
     /**
@@ -350,7 +360,7 @@ class PostFinanceCheckoutTransactionService
 
         $transactionId = $_SESSION['transactionId'] ?? null;
         if ($transactionId) {
-            $this->createLocalPostFinanceCheckoutTransaction((string)$transactionId, (array)$_SESSION['orderData']);
+            $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED);
             $transaction = $this->getTransactionFromPortal($transactionId);
             if ($transaction->getState() === TransactionState::FULFILL) {
                 $this->addIncommingPayment((string)$transactionId, $orderData, $transaction);
@@ -363,15 +373,19 @@ class PostFinanceCheckoutTransactionService
      * @param array $orderData
      * @return void
      */
-    public function updateLocalPostFinanceCheckoutTransaction(string $transactionId): void
+    public function updateLocalPostFinanceCheckoutTransaction(string $transactionId, $state = null): void
     {
+        if ($state === null) {
+            $state = TransactionState::PROCESSING;
+        }
+
         Shop::Container()
             ->getDB()->update(
                 'postfinancecheckout_transactions',
                 ['transaction_id'],
                 [$transactionId],
                 (object)[
-                    'state' => TransactionState::PROCESSING,
+                    'state' => $state,
                     'payment_method' => $_SESSION['Zahlungsart']->cName,
                     'order_id' => $_SESSION['kBestellung'],
                     'space_id' => $this->spaceId,

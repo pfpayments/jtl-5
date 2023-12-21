@@ -145,6 +145,10 @@ class Bootstrap extends Bootstrapper
         $dispatcher->listen('shop.hook.' . \HOOK_BESTELLUNGEN_XML_BESTELLSTATUS, function ($args) use ($handler) {
             $handler->completeOrderAfterWawi($args);
         });
+
+        $dispatcher->listen('shop.hook.' . \HOOK_BESTELLUNGEN_XML_BEARBEITESTORNO, function ($args) use ($handler) {
+            $handler->cancelOrderAfterWawi($args);
+        });
     }
 
     /**
