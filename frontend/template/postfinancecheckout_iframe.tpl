@@ -1,3 +1,5 @@
+<div class="flashbags"></div>
+
 <div class="postfinancecheckout-block">
     <div class="card checkout-card">
         <div class="card-body">

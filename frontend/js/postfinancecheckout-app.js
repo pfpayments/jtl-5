@@ -178,11 +178,11 @@
                 alertContent.appendChild(alertList);
                 for (let index = 0; index < errors.length; index++) {
                     let alertListItem = document.createElement('li');
-                    alertListItem.textContent = errors[index];
+                    alertListItem.innerHTML = errors[index];
                     alertList.appendChild(alertListItem);
                 }
             } else {
-                alertContent.textContent = errors[0];
+                alertContent.innerHTML = errors[0];
             }
         },
 

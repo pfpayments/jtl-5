@@ -107,7 +107,7 @@ final class Handler
         $currencyCheck = $_SESSION['currencyCheck'] ?? null;
         $lineItemsCheck = $_SESSION['lineItemsCheck'] ?? null;
 
-        $md5LieferadresseCheck = md5(json_encode((array)$_SESSION['Lieferadresse']));
+        $md5LieferadresseCheck = isset($_SESSION['Lieferadresse']) && is_array($_SESSION['Lieferadresse']) ? md5(json_encode($_SESSION['Lieferadresse'])) : null;
         $md5LineItemsCheck = md5(json_encode((array)$_SESSION['Warenkorb']->PositionenArr));
         if ($addressCheck !== $md5LieferadresseCheck || $lineItemsCheck !== $md5LineItemsCheck || $currencyCheck !== $_SESSION['cWaehrungName']
         ) {
@@ -186,20 +186,20 @@ final class Handler
 
         $transaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
 
-        if ((int)$order->cStatus === \BESTELLUNG_STATUS_IN_BEARBEITUNG) {
-            if ($transaction->state === TransactionState::AUTHORIZED) {
-                $this->transactionService->cancelPortalTransaction($transactionId);
-            }
-            print 'Cancelled transactionId: ' . $transactionId;
-        }
+        switch ((int)$order->cStatus) {
+            case \BESTELLUNG_STATUS_IN_BEARBEITUNG:
+                if ($transaction->state === TransactionState::AUTHORIZED) {
+                    $this->transactionService->cancelPortalTransaction($transactionId);
+                }
+                break;
 
-        if ((int)$order->cStatus === \BESTELLUNG_STATUS_BEZAHLT) {
-            try {
-                $this->refundService->makeRefund((string)$transactionId, (float)$order->fGesamtsumme);
-            } catch (\Exception $e) {
+            case \BESTELLUNG_STATUS_BEZAHLT:
+                try {
+                    $this->refundService->makeRefund((string)$transactionId, (float)$order->fGesamtsumme);
+                } catch (\Exception $e) {
 
-            }
-            print 'Refund for transactionId: ' . $transactionId . ' of amount ' . $order->fGesamtsumme . ' has been made';
+                }
+                break;
         }
     }
 
@@ -234,7 +234,7 @@ final class Handler
 
         $_SESSION['javascriptUrl'] = $this->apiClient->getTransactionIframeService()
             ->javascriptUrl($spaceId, $createdTransactionId);
-        $_SESSION['appJsUrl'] = $this->plugin->getPaths()->getBaseURL() . 'frontend/js/postfinancecheckout-app.js';
+        $_SESSION['appJsUrl'] = $this->plugin->getPaths()->getBaseURL() . 'frontend/js/postfinancecheckout-app.js?' . time();
 
         $paymentMethod = $this->transactionService->getTransactionPaymentMethod($createdTransactionId, $spaceId);
         if (empty($paymentMethod)) {
@@ -259,9 +259,13 @@ final class Handler
 
     public function contentUpdate(array $args): void
     {
+        global $step;
+
         switch (Shop::getPageType()) {
             case \PAGE_BESTELLVORGANG:
-                $this->handleTransaction();
+                if ($step !== 'accountwahl') {
+                    $this->handleTransaction();
+                }
                 $this->setPaymentMethodLogoSize();
                 break;
 
@@ -284,7 +288,7 @@ final class Handler
     {
         global $step;
 
-        if (in_array($step, ['Zahlung', 'Versand'])) {
+        if (\in_array($step, ['Zahlung', 'Versand'])) {
             $paymentMethodsCss = '<link rel="stylesheet" href="' . $this->plugin->getPaths()->getBaseURL() . 'frontend/css/checkout-payment-methods.css">';
             pq('head')->append($paymentMethodsCss);
         }

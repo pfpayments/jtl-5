@@ -80,12 +80,6 @@ class PostFinanceCheckoutTransactionService
         $transactionPayload->setFailedUrl($failedUrl);
         $createdTransaction = $this->apiClient->getTransactionService()->create($this->spaceId, $transactionPayload);
 
-        $obj = Shop::Container()->getDB()->selectSingleRow('tzahlungsart', 'kZahlungsart', (int)$_SESSION['AktiveZahlungsart']);
-        $createOrderBeforePayment = (int)$obj->nWaehrendBestellung ?? 0;
-        if ($createOrderBeforePayment === 1) {
-            $this->createLocalPostFinanceCheckoutTransaction((string)$createdTransaction->getId(), (array)$order);
-        }
-
         return $createdTransaction;
     }
 
@@ -105,19 +99,41 @@ class PostFinanceCheckoutTransactionService
         $pendingTransaction->setCurrency($_SESSION['cWaehrungName']);
         $pendingTransaction->setLanguage(PostFinanceCheckoutHelper::getLanguageString());
 
-        $orderId = $_SESSION['kBestellung'];
-        $orderNr = $_SESSION['BestellNr'];
-
         $obj = Shop::Container()->getDB()->selectSingleRow('tzahlungsart', 'kZahlungsart', (int)$_SESSION['AktiveZahlungsart']);
-        $createOrderBeforePayment = (int)$obj->nWaehrendBestellung ?? 0;
-        if ($createOrderBeforePayment === 1) {
+        $createOrderAfterPayment = (int)$obj->nWaehrendBestellung ?? 1;
+
+        if ($createOrderAfterPayment === 1) {
             $orderId = null;
             $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
             $orderNr = $orderHandler->createOrderNo();
+
+            $order = new \stdClass();
+            $order->transaction_id = $transactionId;
+            $order->data = json_encode([]);
+            $order->payment_method = $_SESSION['possiblePaymentMethodName'];
+            $order->order_id = null;
+            $order->space_id = $this->spaceId;
+            $order->state = TransactionState::PENDING;
+            $order->created_at = date('Y-m-d H:i:s');
+            $this->createLocalPostFinanceCheckoutTransaction((string)$transactionId, (array)$order);
+
         } else {
-            $order = new Bestellung($orderId);
+            $orderId = $_SESSION['kBestellung'] ?? $_SESSION['oBesucher']->kBestellung;
+            $orderNr = $_SESSION['BestellNr'] ?? $_SESSION['nextOrderNr'];
+
+            $order = new \stdClass();
+            $order->transaction_id = $transactionId;
+            $order->data = json_encode((array)$order);
+            $order->payment_method = $_SESSION['possiblePaymentMethodName'];
+            $order->order_id = $orderId;
+            $order->space_id = $this->spaceId;
+            $order->state = TransactionState::PENDING;
+            $order->created_at = date('Y-m-d H:i:s');
+
             $this->createLocalPostFinanceCheckoutTransaction((string)$transactionId, (array)$order);
         }
+        $_SESSION['orderId'] = $orderId;
+
         $_SESSION['nextOrderNr'] = $orderNr;
         $pendingTransaction->setMetaData([
             'orderId' => $orderId,
@@ -129,7 +145,7 @@ class PostFinanceCheckoutTransactionService
         $this->apiClient->getTransactionService()
             ->confirm($this->spaceId, $pendingTransaction);
 
-        if ($createOrderBeforePayment === 1) {
+        if ($createOrderAfterPayment === 1) {
             $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId);
         }
     }
@@ -229,14 +245,13 @@ class PostFinanceCheckoutTransactionService
 
     public function updateTransactionStatus($transactionId, $newStatus)
     {
-        $updated = Shop::Container()
+        Shop::Container()
             ->getDB()->update(
                 'postfinancecheckout_transactions',
                 ['transaction_id'],
                 [$transactionId],
                 (object)['state' => $newStatus]
             );
-        print 'Updated ' . $updated;
     }
 
     /**
@@ -316,8 +331,8 @@ class PostFinanceCheckoutTransactionService
         $newTransaction = new \stdClass();
         $newTransaction->transaction_id = $transactionId;
         $newTransaction->data = json_encode($orderData);
-        $newTransaction->payment_method = $orderData['cZahlungsartName'];
-        $newTransaction->order_id = $orderData['kBestellung'];
+        $newTransaction->payment_method = $orderData['payment_method'];
+        $newTransaction->order_id = $orderData['order_id'];
         $newTransaction->space_id = $this->spaceId;
         $newTransaction->state = TransactionState::PENDING;
         $newTransaction->created_at = date('Y-m-d H:i:s');
@@ -335,15 +350,20 @@ class PostFinanceCheckoutTransactionService
     {
         $localTransaction = $this->getLocalPostFinanceCheckoutTransactionById($transactionId);
         if ($localTransaction->state !== TransactionState::FULFILL) {
+            $_SESSION['orderId'] = (int)$order->kBestellung;
             $this->updateTransactionStatus($transactionId, TransactionState::FULFILL);
             $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
             $paymentMethod = new Method($paymentMethodEntity->cModulId);
-            $paymentMethod->setOrderStatusToPaid($order);
-            $incomingPayment = new stdClass();
-            $incomingPayment->fBetrag = $transaction->getAuthorizationAmount();
-            $incomingPayment->cISO = $transaction->getCurrency();
-            $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
-            $paymentMethod->addIncomingPayment($order, $incomingPayment);
+
+            $portalTransaction = $this->getTransactionFromPortal($transactionId);
+            if ($portalTransaction->getState() === TransactionState::FULFILL) {
+                $paymentMethod->setOrderStatusToPaid($order);
+                $incomingPayment = new stdClass();
+                $incomingPayment->fBetrag = $transaction->getAuthorizationAmount();
+                $incomingPayment->cISO = $transaction->getCurrency();
+                $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
+                $paymentMethod->addIncomingPayment($order, $incomingPayment);
+            }
         }
     }
 
@@ -359,8 +379,9 @@ class PostFinanceCheckoutTransactionService
         $_SESSION['orderData'] = $orderData;
 
         $transactionId = $_SESSION['transactionId'] ?? null;
+
         if ($transactionId) {
-            $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED);
+            $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED, (int)$order->kBestellung);
             $transaction = $this->getTransactionFromPortal($transactionId);
             if ($transaction->getState() === TransactionState::FULFILL) {
                 $this->addIncommingPayment((string)$transactionId, $orderData, $transaction);
@@ -373,10 +394,14 @@ class PostFinanceCheckoutTransactionService
      * @param array $orderData
      * @return void
      */
-    public function updateLocalPostFinanceCheckoutTransaction(string $transactionId, $state = null): void
+    public function updateLocalPostFinanceCheckoutTransaction(string $transactionId, $state = null, $orderId = null): void
     {
         if ($state === null) {
             $state = TransactionState::PROCESSING;
+        }
+
+        if ($orderId === null) {
+            $orderId = $_SESSION['orderId'];
         }
 
         Shop::Container()
@@ -386,8 +411,8 @@ class PostFinanceCheckoutTransactionService
                 [$transactionId],
                 (object)[
                     'state' => $state,
-                    'payment_method' => $_SESSION['Zahlungsart']->cName,
-                    'order_id' => $_SESSION['kBestellung'],
+                    'payment_method' => $_SESSION['possiblePaymentMethodName'],
+                    'order_id' => $orderId,
                     'space_id' => $this->spaceId,
                     'updated_at' => date('Y-m-d H:i:s')
                 ]
@@ -417,10 +442,16 @@ class PostFinanceCheckoutTransactionService
      */
     private function createLineItemProductItem(CartItem $productData): LineItemCreate
     {
+
         $lineItem = new LineItemCreate();
         $name = \is_array($productData->cName) ? $productData->cName[$_SESSION['cISOSprache']] : $productData->cName;
         $lineItem->setName($name);
-        $lineItem->setUniqueId($productData->cArtNr);
+
+        $slug = strtolower(str_replace([' ', '+', '%', '[', ']', '=>'], ['-', '', '', '', '', '-'], $name));
+        $slug = preg_replace('/-+/', '-', $slug);
+        $slug = trim($slug, '-');
+
+        $lineItem->setUniqueId($productData->cArtNr ?: $slug);
         $lineItem->setSku($productData->cArtNr);
         $lineItem->setQuantity($productData->nAnzahl);
         preg_match_all('!\d+!', $productData->cGesamtpreisLocalized[0][$_SESSION['cWaehrungName']], $price);

@@ -37,11 +37,16 @@ if (!function_exists('restoreCart')) {
                 continue;
             }
 
+            $quantityBefore = (int) $cartItem->fLagerbestandVorAbschluss;
+            if ($quantityBefore < 1) {
+                continue;
+            }
+
             Shop::Container()->getDB()->update(
                 'tartikel',
                 'kArtikel',
                 (int)$cartItem->kArtikel,
-                (object)['fLagerbestand' => $cartItem->fLagerbestandVorAbschluss]
+                (object)['fLagerbestand' => $quantityBefore]
             );
         }
     }
