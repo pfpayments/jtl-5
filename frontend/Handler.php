@@ -4,15 +4,16 @@ namespace Plugin\jtl_postfinancecheckout\frontend;
 
 use JTL\Checkout\Bestellung;
 use JTL\Checkout\OrderHandler;
+use JTL\Checkout\Zahlungsart;
 use JTL\DB\DbInterface;
+use JTL\Helpers\PaymentMethod;
+use JTL\Plugin\Payment\Method;
 use JTL\Plugin\PluginInterface;
 use JTL\Session\Frontend;
 use JTL\Shop;
 use JTL\Smarty\JTLSmarty;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutRefundService;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
-use Plugin\jtl_postfinancecheckout\Webhooks\Strategies\PostFinanceCheckoutNameOrderUpdateTransactionStrategy;
-use Plugin\jtl_postfinancecheckout\Webhooks\PostFinanceCheckoutOrderUpdater;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 use PostFinanceCheckout\Sdk\ApiClient;
 use PostFinanceCheckout\Sdk\Model\TransactionState;
@@ -195,7 +196,8 @@ final class Handler
 
             case \BESTELLUNG_STATUS_BEZAHLT:
                 try {
-                    $this->refundService->makeRefund((string)$transactionId, (float)$order->fGesamtsumme);
+                    $portalTransaction = $this->transactionService->getTransactionFromPortal($transactionId);
+                    $this->refundService->makeRefund((string)$transactionId, (float)$portalTransaction->getAuthorizationAmount());
                 } catch (\Exception $e) {
 
                 }

@@ -5,10 +5,13 @@ namespace Plugin\jtl_postfinancecheckout\adminmenu;
 use JTL\Catalog\Currency;
 use JTL\Catalog\Product\Preise;
 use JTL\Checkout\Bestellung;
+use JTL\Checkout\Zahlungsart;
 use JTL\DB\DbInterface;
 use JTL\DB\ReturnType;
+use JTL\Helpers\PaymentMethod;
 use JTL\Language\LanguageHelper;
 use JTL\Pagination\Pagination;
+use JTL\Plugin\Payment\Method;
 use JTL\Plugin\Plugin;
 use JTL\Plugin\PluginInterface;
 use JTL\Session\Frontend;
@@ -17,6 +20,7 @@ use JTL\Smarty\JTLSmarty;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutRefundService;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
+use stdClass;
 use PostFinanceCheckout\Sdk\ApiClient;
 use PostFinanceCheckout\Sdk\Model\{TransactionInvoiceState, TransactionState};
 
@@ -107,6 +111,22 @@ class AdminTabProvider
                     $transactionId = $_REQUEST['transactionId'] ?: null;
                     $amount = $_REQUEST['amount'] ?: 0;
                     $this->refundService->makeRefund($transactionId, floatval($amount));
+
+
+                    $transaction = $this->transactionService->getTransactionFromPortal($transactionId);
+                    $transactionId = $transaction->getId();
+                    $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
+                    $orderId = (int)$localTransaction->order_id;
+                    $order = new Bestellung($orderId);
+
+                    $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+                    $paymentMethod = new Method($paymentMethodEntity->cModulId);
+                    $paymentMethod->setOrderStatusToPaid($order);
+                    $incomingPayment = new stdClass();
+                    $incomingPayment->fBetrag = -1 * floatval($amount);
+                    $incomingPayment->cISO = $transaction->getCurrency();
+                    $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
+                    $paymentMethod->addIncomingPayment($order, $incomingPayment);
                     exit;
 
                 case self::ACTION_ORDER_DETAILS:

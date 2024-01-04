@@ -20,8 +20,7 @@ use PostFinanceCheckout\Sdk\Model\{AddressCreate,
     Transaction,
     TransactionCreate,
     TransactionPending,
-    TransactionState
-};
+    TransactionState};
 
 class PostFinanceCheckoutRefundService
 {

@@ -78,10 +78,13 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
             case TransactionState::DECLINE:
             case TransactionState::VOIDED:
             case TransactionState::FAILED:
-                $order = new Bestellung($orderId);
-                $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                $paymentMethod = new Method($paymentMethodEntity->cModulId);
-                $paymentMethod->cancelOrder($orderId);
+                if ($orderId > 0) {
+                    $order = new Bestellung($orderId);
+                    $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+                    $moduleId = new Method($paymentMethodEntity->cModulId) ?? '';
+                    $paymentMethod = new Method($moduleId);
+                    $paymentMethod->cancelOrder($orderId);
+                }
                 $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
                 print 'Order ' . $orderId . ' status was updated to cancelled';
                 break;

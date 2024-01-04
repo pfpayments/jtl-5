@@ -353,11 +353,12 @@ class PostFinanceCheckoutTransactionService
         if ($localTransaction->state !== TransactionState::FULFILL) {
             $_SESSION['orderId'] = (int)$order->kBestellung;
             $this->updateTransactionStatus($transactionId, TransactionState::FULFILL);
-            $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-            $paymentMethod = new Method($paymentMethodEntity->cModulId);
 
             $portalTransaction = $this->getTransactionFromPortal($transactionId);
             if ($portalTransaction->getState() === TransactionState::FULFILL) {
+                $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+                $moduleId = $paymentMethodEntity->cModulId ?? '';
+                $paymentMethod = new Method($moduleId);
                 $paymentMethod->setOrderStatusToPaid($order);
                 $incomingPayment = new stdClass();
                 $incomingPayment->fBetrag = $transaction->getAuthorizationAmount();

@@ -6,12 +6,16 @@ if (file_exists(dirname(__DIR__) . '/jtl_postfinancecheckout/vendor/autoload.php
     require_once dirname(__DIR__) . '/jtl_postfinancecheckout/vendor/autoload.php';
 }
 
+use JTL\Checkout\Bestellung;
+use JTL\Checkout\Zahlungsart;
 use JTL\Events\Dispatcher;
+use JTL\Helpers\PaymentMethod;
 use JTL\phpQuery\phpQuery;
 use JTL\Plugin\Bootstrapper;
+use JTL\Plugin\Helper;
+use JTL\Plugin\Payment\Method;
 use JTL\Shop;
 use JTL\Smarty\JTLSmarty;
-use JTL\Plugin\Helper;
 use Plugin\jtl_paypal\paymentmethod\PendingPayment;
 use Plugin\jtl_postfinancecheckout\adminmenu\AdminTabProvider;
 use Plugin\jtl_postfinancecheckout\frontend\Handler as FrontendHandler;
@@ -140,6 +144,24 @@ class Bootstrap extends Bootstrapper
             $smarty = Shop::Smarty();
             $paymentMethods = $handler->getPaymentMethodsForForm($smarty);
             $smarty->assign('Zahlungsarten', $paymentMethods);
+        });
+
+        $dispatcher->listen('shop.hook.' . \HOOK_BESTELLUNGEN_XML_BEARBEITESET, function ($args) use ($handler) {
+            $order = $args['oBestellung'] ?? [];
+            if ((int)$order->cStatus === \BESTELLUNG_STATUS_BEZAHLT) {
+                $order = new Bestellung($args['oBestellung']->kBestellung);
+                $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+                $paymentMethod = new Method($paymentMethodEntity->cModulId);
+                $paymentMethod->setOrderStatusToPaid($order);
+
+                Shop::Container()
+                    ->getDB()->update(
+                        'tbestellung',
+                        ['kBestellung',],
+                        [$args['oBestellung']->kBestellung],
+                        (object)['cAbgeholt' => 'Y']
+                    );
+            }
         });
 
         $dispatcher->listen('shop.hook.' . \HOOK_BESTELLUNGEN_XML_BESTELLSTATUS, function ($args) use ($handler) {
