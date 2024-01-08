@@ -315,7 +315,13 @@ class PostFinanceCheckoutTransactionService
                 case \C_WARENKORBPOS_TYP_VERPACKUNG:
                 case \C_WARENKORBPOS_TYP_GRATISGESCHENK:
                 default:
-                    $lineItems[] = $this->createLineItemProductItem($product);
+                    $isDiscount = false;
+                    if (\in_array($product->nPosTyp, [
+                        \C_WARENKORBPOS_TYP_KUPON
+                    ], true)) {
+                        $isDiscount = true;
+                    }
+                    $lineItems[] = $this->createLineItemProductItem($product, $isDiscount);
             }
         }
 
@@ -442,7 +448,7 @@ class PostFinanceCheckoutTransactionService
      * @param CartItem $productData
      * @return LineItemCreate
      */
-    private function createLineItemProductItem(CartItem $productData): LineItemCreate
+    private function createLineItemProductItem(CartItem $productData, $isDiscount = false): LineItemCreate
     {
 
         $lineItem = new LineItemCreate();
@@ -460,8 +466,16 @@ class PostFinanceCheckoutTransactionService
         $priceDecimal = number_format(floatval(($price[0][0] . '.' . $price[0][1])), 2);
         $priceDecimal = (float)str_replace(',', '', $priceDecimal);
 
+        if ($priceDecimal > 0 && $isDiscount) {
+            $priceDecimal = -1 * $priceDecimal;
+        }
         $lineItem->setAmountIncludingTax($priceDecimal);
-        $lineItem->setType(LineItemType::PRODUCT);
+
+        $type = LineItemType::PRODUCT;
+        if ($isDiscount) {
+            $type = LineItemType::DISCOUNT;
+        }
+        $lineItem->setType($type);
 
         return $lineItem;
     }

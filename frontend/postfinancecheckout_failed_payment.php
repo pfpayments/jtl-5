@@ -21,12 +21,12 @@ if ($transactionId) {
     unset($_SESSION['transactionId']);
 
     $errorMessage = $transaction->getUserFailureMessage() ?? '';
+    $alertHelper = Shop::Container()->getAlertService();
+    $alertHelper->addAlert(Alert::TYPE_ERROR, $errorMessage, md5($errorMessage), ['saveInSession' => true]);
+
     if (str_contains(strtolower($errorMessage), 'timeout')) {
-        unset($_SESSION['transactionId']);
         unset($_SESSION['arrayOfPossibleMethods']);
     }
-    $alertHelper = Shop::Container()->getAlertService();
-    $alertHelper->addAlert(Alert::TYPE_ERROR, $errorMessage, 'display error on payment page', ['saveInSession' => true]);
 }
 
 if (!function_exists('restoreCart')) {
@@ -37,7 +37,7 @@ if (!function_exists('restoreCart')) {
                 continue;
             }
 
-            $quantityBefore = (int) $cartItem->fLagerbestandVorAbschluss;
+            $quantityBefore = (int)$cartItem->fLagerbestandVorAbschluss;
             if ($quantityBefore < 1) {
                 continue;
             }
@@ -59,7 +59,6 @@ if (isset($_SESSION['orderData']) && !empty($_SESSION['orderData']->Positionen))
     }
 }
 
-$alertHelper = Shop::Container()->getAlertService();
-$alertHelper->addAlert(Alert::TYPE_ERROR, $errorMessage, 'display error on payment page', ['saveInSession' => true]);
-\header('Location:' . Shop::getURL() . '/Bestellvorgang?editVersandart=1');
+$linkHelper = Shop::Container()->getLinkService();
+\header('Location: ' . $linkHelper->getStaticRoute('bestellvorgang.php') . '?editZahlungsart=1');
 exit;
