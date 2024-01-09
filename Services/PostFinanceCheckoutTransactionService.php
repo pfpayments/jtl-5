@@ -3,10 +3,12 @@
 namespace Plugin\jtl_postfinancecheckout\Services;
 
 use JTL\Cart\CartItem;
+use JTL\Catalog\Product\Preise;
 use JTL\Checkout\Bestellung;
 use JTL\Checkout\OrderHandler;
 use JTL\Checkout\Zahlungsart;
 use JTL\Helpers\PaymentMethod;
+use JTL\Helpers\Tax;
 use JTL\Plugin\Payment\Method;
 use JTL\Plugin\Plugin;
 use JTL\Session\Frontend;
@@ -21,8 +23,7 @@ use PostFinanceCheckout\Sdk\Model\{AddressCreate,
     TransactionCreate,
     TransactionInvoice,
     TransactionPending,
-    TransactionState
-};
+    TransactionState};
 
 class PostFinanceCheckoutTransactionService
 {
@@ -370,6 +371,7 @@ class PostFinanceCheckoutTransactionService
                 $incomingPayment->fBetrag = $transaction->getAuthorizationAmount();
                 $incomingPayment->cISO = $transaction->getCurrency();
                 $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
+                $incomingPayment->cHinweis = $transactionId;
                 $paymentMethod->addIncomingPayment($order, $incomingPayment);
             }
         }
@@ -462,9 +464,14 @@ class PostFinanceCheckoutTransactionService
         $lineItem->setUniqueId($productData->cArtNr ?: $slug);
         $lineItem->setSku($productData->cArtNr);
         $lineItem->setQuantity($productData->nAnzahl);
-        preg_match_all('!\d+!', $productData->cGesamtpreisLocalized[0][$_SESSION['cWaehrungName']], $price);
-        $priceDecimal = number_format(floatval(($price[0][0] . '.' . $price[0][1])), 2);
-        $priceDecimal = (float)str_replace(',', '', $priceDecimal);
+
+        $currencyFactor = Frontend::getCurrency()->getConversionFactor();
+        $priceDecimal = Tax::getGross(
+            $productData->fPreis * $productData->nAnzahl,
+            CartItem::getTaxRate($productData)
+        );
+        $priceDecimal *= $currencyFactor;
+        $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
 
         if ($priceDecimal > 0 && $isDiscount) {
             $priceDecimal = -1 * $priceDecimal;
@@ -492,9 +499,14 @@ class PostFinanceCheckoutTransactionService
         $lineItem->setUniqueId('shipping: ' . $name);
         $lineItem->setSku('shipping: ' . $name);
         $lineItem->setQuantity(1);
-        preg_match_all('!\d+!', $productData->cGesamtpreisLocalized[0][$_SESSION['cWaehrungName']], $price);
-        $priceDecimal = number_format(floatval(($price[0][0] . '.' . $price[0][1])), 2);
-        $priceDecimal = (float)str_replace(',', '', $priceDecimal);
+        $currencyFactor = Frontend::getCurrency()->getConversionFactor();
+        $priceDecimal = Tax::getGross(
+            $productData->fPreis * $productData->nAnzahl,
+            CartItem::getTaxRate($productData)
+        );
+        $priceDecimal *= $currencyFactor;
+        $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
+
         $lineItem->setAmountIncludingTax($priceDecimal);
         $lineItem->setType(LineItemType::SHIPPING);
 
