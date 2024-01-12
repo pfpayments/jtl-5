@@ -23,6 +23,11 @@ $_SESSION['Warenkorb'] = null;
 $_SESSION['transactionId'] = null;
 $_SESSION['arrayOfPossibleMethods'] = null;
 
-$smarty
-    ->assign('Bestellung', $_SESSION['orderData'])
-    ->assign('mainCssUrl', $plugin->getPaths()->getBaseURL() . 'frontend/css/postfinancecheckout-loader-main.css');
+$linkHelper = Shop::Container()->getLinkService();
+$orderId = $_SESSION['orderData']->kBestellung ?? 0;
+$bestellid = $this->db->select('tbestellid', 'kBestellung', $orderId);
+$controlId = $bestellid->cId ?? '';
+$url = $linkHelper->getStaticRoute('bestellabschluss.php') . '?i=' . $controlId;
+
+\header('Location: ' . $url);
+exit;
