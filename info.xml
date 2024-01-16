@@ -9,7 +9,7 @@
     <Icon>logo.jpg</Icon>
     <PluginID>jtl_postfinancecheckout</PluginID>
     <CreateDate>2023-05-29</CreateDate>
-    <Version>1.0.17</Version>
+    <Version>1.0.18</Version>
     <Install>
         <Locales>
             <Variable>
@@ -295,7 +295,7 @@
             <Link>
                 <Filename>postfinancecheckout_thank_you_page.php</Filename>
                 <Name>PostFinanceCheckout Payment</Name>
-                <Template>postfinancecheckout_thank_you_page.tpl</Template>
+                <Template>empty.tpl</Template>
                 <VisibleAfterLogin>N</VisibleAfterLogin>
                 <PrintButton>N</PrintButton>
                 <SSL>2</SSL>
