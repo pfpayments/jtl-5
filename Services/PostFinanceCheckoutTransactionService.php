@@ -17,6 +17,7 @@ use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 use stdClass;
 use PostFinanceCheckout\Sdk\ApiClient;
 use PostFinanceCheckout\Sdk\Model\{AddressCreate,
+    Gender,
     LineItemCreate,
     LineItemType,
     Transaction,
@@ -143,7 +144,6 @@ class PostFinanceCheckoutTransactionService
         ]);
 
         $pendingTransaction->setMerchantReference($orderNr);
-
         $this->apiClient->getTransactionService()
             ->confirm($this->spaceId, $pendingTransaction);
 
@@ -533,6 +533,12 @@ class PostFinanceCheckoutTransactionService
         $billingAddress->setPhoneNumber($customer->cMobil);
         $billingAddress->setSalutation($customer->cTitel);
 
+        $gender = $_SESSION['orderData']?->oKunde?->cAnrede ?? null;
+        if ($gender !== null) {
+            $billingAddress->setGender($gender === 'm' ? Gender::MALE : Gender::FEMALE);
+            $billingAddress->setSalutation($gender === 'm' ? 'Mr' : 'Ms');
+        }
+
         return $billingAddress;
     }
 
@@ -555,6 +561,12 @@ class PostFinanceCheckoutTransactionService
         $shippingAddress->setOrganizationName($customer->cFirma);
         $shippingAddress->setPhoneNumber($customer->cMobil);
         $shippingAddress->setSalutation($customer->cTitel);
+
+        $gender = $_SESSION['orderData']?->oKunde?->cAnrede ?? null;
+        if ($gender !== null) {
+            $shippingAddress->setGender($gender === 'm' ? Gender::MALE : Gender::FEMALE);
+            $shippingAddress->setSalutation($gender === 'm' ? 'Mr' : 'Ms');
+        }
 
         return $shippingAddress;
     }
