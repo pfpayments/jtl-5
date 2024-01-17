@@ -150,8 +150,10 @@ class Bootstrap extends Bootstrapper
             $order = $args['oBestellung'] ?? [];
             if ((int)$order->cStatus === \BESTELLUNG_STATUS_BEZAHLT) {
                 $order = new Bestellung($args['oBestellung']->kBestellung);
+
                 $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                $paymentMethod = new Method($paymentMethodEntity->cModulId);
+                $moduleId = $paymentMethodEntity->cModulId ?? '';
+                $paymentMethod = new Method($moduleId);
                 $paymentMethod->setOrderStatusToPaid($order);
 
                 Shop::Container()

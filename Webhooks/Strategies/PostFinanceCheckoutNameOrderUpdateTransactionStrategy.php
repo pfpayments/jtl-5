@@ -81,7 +81,7 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
                 if ($orderId > 0) {
                     $order = new Bestellung($orderId);
                     $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                    $moduleId = new Method($paymentMethodEntity->cModulId) ?? '';
+                    $moduleId = $paymentMethodEntity->cModulId ?? '';
                     $paymentMethod = new Method($moduleId);
                     $paymentMethod->cancelOrder($orderId);
                 }

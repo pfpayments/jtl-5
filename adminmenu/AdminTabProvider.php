@@ -120,7 +120,8 @@ class AdminTabProvider
                     $order = new Bestellung($orderId);
 
                     $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                    $paymentMethod = new Method($paymentMethodEntity->cModulId);
+                    $moduleId = $paymentMethodEntity->cModulId ?? '';
+                    $paymentMethod = new Method($moduleId);
                     $paymentMethod->setOrderStatusToPaid($order);
                     $incomingPayment = new stdClass();
                     $incomingPayment->fBetrag = -1 * floatval($amount);
