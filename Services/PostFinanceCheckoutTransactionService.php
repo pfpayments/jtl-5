@@ -162,7 +162,13 @@ class PostFinanceCheckoutTransactionService
         $pendingTransaction->setId($transactionId);
 
         $transaction = $this->getTransactionFromPortal($transactionId);
-        $pendingTransaction->setVersion($transaction->getVersion() + 1);
+        if (empty($transaction) || empty($transaction->getVersion())) {
+            $_SESSION['transactionId'] = null;
+            $createdTransactionId = $this->createTransaction();
+            $_SESSION['transactionId'] = $createdTransactionId;
+            return;
+        }
+        $pendingTransaction->setVersion($transaction->getVersion());
 
         $lineItems = $this->getLineItems($_SESSION['Warenkorb']->PositionenArr);
         $pendingTransaction->setLineItems($lineItems);
