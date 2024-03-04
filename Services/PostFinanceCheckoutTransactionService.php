@@ -20,6 +20,7 @@ use PostFinanceCheckout\Sdk\Model\{AddressCreate,
     Gender,
     LineItemCreate,
     LineItemType,
+    TaxCreate,
     Transaction,
     TransactionCreate,
     TransactionInvoice,
@@ -136,7 +137,6 @@ class PostFinanceCheckoutTransactionService
             $this->createLocalPostFinanceCheckoutTransaction((string)$transactionId, (array)$order);
         }
         $_SESSION['orderId'] = $orderId;
-
         $_SESSION['nextOrderNr'] = $orderNr;
         $pendingTransaction->setMetaData([
             'orderId' => $orderId,
@@ -332,6 +332,18 @@ class PostFinanceCheckoutTransactionService
             }
         }
 
+        if ($_SESSION['Bestellung']->GuthabenNutzen ?? 0 === 1) {
+            if ($_SESSION['Bestellung']->fGuthabenGenutzt > 0) {
+                $product = new CartItem();
+                $product->cName = 'Voucher';
+                $product->cArtNr = 'voucher-customer-credit';
+                $product->nAnzahl = 1;
+                $product->fPreis = $_SESSION['Bestellung']->fGuthabenGenutzt;
+
+                $lineItems[] = $this->createLineItemProductItem($product, true);
+            }
+        }
+
         return $lineItems;
     }
 
@@ -458,7 +470,6 @@ class PostFinanceCheckoutTransactionService
      */
     private function createLineItemProductItem(CartItem $productData, $isDiscount = false): LineItemCreate
     {
-
         $lineItem = new LineItemCreate();
         $name = \is_array($productData->cName) ? $productData->cName[$_SESSION['cISOSprache']] : $productData->cName;
         $lineItem->setName($name);
@@ -467,27 +478,36 @@ class PostFinanceCheckoutTransactionService
         $slug = preg_replace('/-+/', '-', $slug);
         $slug = trim($slug, '-');
 
-        $lineItem->setUniqueId($productData->cArtNr ?: $slug);
+        $uniqueName = $productData->cArtNr ?: $slug;
+        if ($isDiscount || $productData->nPosTyp === \C_WARENKORBPOS_TYP_GUTSCHEIN) {
+            $uniqueName = $uniqueName . '_' . rand(1, 99999);
+        } else {
+            $taxRate = CartItem::getTaxRate($productData);
+            $tax = (new TaxCreate())
+                ->setRate($taxRate)
+                ->setTitle('Tax: ' . $taxRate . '%');
+            $taxes[] = $tax;
+            $lineItem->setTaxes($taxes);
+        }
+
+        $lineItem->setUniqueId($uniqueName);
         $lineItem->setSku($productData->cArtNr);
         $lineItem->setQuantity($productData->nAnzahl);
 
-        $currencyFactor = Frontend::getCurrency()->getConversionFactor();
-        $priceDecimal = Tax::getGross(
-            $productData->fPreis * $productData->nAnzahl,
-            CartItem::getTaxRate($productData)
-        );
-        $priceDecimal *= $currencyFactor;
-        $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
-
-        if ($priceDecimal > 0 && $isDiscount) {
-            $priceDecimal = -1 * $priceDecimal;
+        $type = LineItemType::PRODUCT;
+        if ($isDiscount === false) {
+            $currencyFactor = Frontend::getCurrency()->getConversionFactor();
+            $priceDecimal = Tax::getGross(
+                $productData->fPreis * $productData->nAnzahl,
+                CartItem::getTaxRate($productData)
+            );
+            $priceDecimal *= $currencyFactor;
+            $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
+        } else {
+            $type = LineItemType::DISCOUNT;
+            $priceDecimal = -1 * (float)number_format($productData->fPreis, 2, '.', '');
         }
         $lineItem->setAmountIncludingTax($priceDecimal);
-
-        $type = LineItemType::PRODUCT;
-        if ($isDiscount) {
-            $type = LineItemType::DISCOUNT;
-        }
         $lineItem->setType($type);
 
         return $lineItem;
@@ -514,6 +534,12 @@ class PostFinanceCheckoutTransactionService
         $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
 
         $lineItem->setAmountIncludingTax($priceDecimal);
+        $taxRate = CartItem::getTaxRate($productData);
+        $tax = (new TaxCreate())
+            ->setRate($taxRate)
+            ->setTitle('Tax: ' . $taxRate . '%');
+        $taxes[] = $tax;
+        $lineItem->setTaxes($taxes);
         $lineItem->setType(LineItemType::SHIPPING);
 
         return $lineItem;
@@ -527,7 +553,7 @@ class PostFinanceCheckoutTransactionService
         $customer = $_SESSION['Kunde'];
 
         $billingAddress = new AddressCreate();
-        $billingAddress->setStreet($customer->cStrasse);
+        $billingAddress->setStreet($customer->cStrasse . ' ' . $customer->cHausnummer);
         $billingAddress->setCity($customer->cOrt);
         $billingAddress->setCountry($customer->cLand);
         $billingAddress->setEmailAddress($customer->cMail);
@@ -541,6 +567,7 @@ class PostFinanceCheckoutTransactionService
 
         $gender = $_SESSION['orderData']?->oKunde?->cAnrede ?? null;
         if ($gender !== null) {
+
             $billingAddress->setGender($gender === 'm' ? Gender::MALE : Gender::FEMALE);
             $billingAddress->setSalutation($gender === 'm' ? 'Mr' : 'Ms');
         }
@@ -556,7 +583,7 @@ class PostFinanceCheckoutTransactionService
         $customer = $_SESSION['Lieferadresse'];
 
         $shippingAddress = new AddressCreate();
-        $shippingAddress->setStreet($customer->cStrasse);
+        $shippingAddress->setStreet($customer->cStrasse . ' ' . $customer->cHausnummer);
         $shippingAddress->setCity($customer->cOrt);
         $shippingAddress->setCountry($customer->cLand);
         $shippingAddress->setEmailAddress($customer->cMail);
