@@ -481,31 +481,27 @@ class PostFinanceCheckoutTransactionService
         $uniqueName = $productData->cArtNr ?: $slug;
         if ($isDiscount || $productData->nPosTyp === \C_WARENKORBPOS_TYP_GUTSCHEIN) {
             $uniqueName = $uniqueName . '_' . rand(1, 99999);
-        } else {
-            $taxRate = CartItem::getTaxRate($productData);
-            $tax = (new TaxCreate())
-                ->setRate($taxRate)
-                ->setTitle('Tax: ' . $taxRate . '%');
-            $taxes[] = $tax;
-            $lineItem->setTaxes($taxes);
         }
 
         $lineItem->setUniqueId($uniqueName);
         $lineItem->setSku($productData->cArtNr);
         $lineItem->setQuantity($productData->nAnzahl);
 
+        $currencyFactor = Frontend::getCurrency()->getConversionFactor();
+        // fPreis is price, nAnzahl is quantity
+        $priceDecimal = Tax::getGross(
+            $productData->fPreis * $productData->nAnzahl,
+            CartItem::getTaxRate($productData)
+        );
+        $priceDecimal *= $currencyFactor;
+        $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
+
         $type = LineItemType::PRODUCT;
-        if ($isDiscount === false) {
-            $currencyFactor = Frontend::getCurrency()->getConversionFactor();
-            $priceDecimal = Tax::getGross(
-                $productData->fPreis * $productData->nAnzahl,
-                CartItem::getTaxRate($productData)
-            );
-            $priceDecimal *= $currencyFactor;
-            $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
-        } else {
+        if ($isDiscount === true) {
             $type = LineItemType::DISCOUNT;
-            $priceDecimal = -1 * (float)number_format($productData->fPreis, 2, '.', '');
+            if ($priceDecimal > 0) {
+                $priceDecimal = -1 * $priceDecimal;
+            }
         }
         $lineItem->setAmountIncludingTax($priceDecimal);
         $lineItem->setType($type);
@@ -534,12 +530,6 @@ class PostFinanceCheckoutTransactionService
         $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
 
         $lineItem->setAmountIncludingTax($priceDecimal);
-        $taxRate = CartItem::getTaxRate($productData);
-        $tax = (new TaxCreate())
-            ->setRate($taxRate)
-            ->setTitle('Tax: ' . $taxRate . '%');
-        $taxes[] = $tax;
-        $lineItem->setTaxes($taxes);
         $lineItem->setType(LineItemType::SHIPPING);
 
         return $lineItem;
