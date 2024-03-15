@@ -25,7 +25,8 @@ use PostFinanceCheckout\Sdk\Model\{AddressCreate,
     TransactionCreate,
     TransactionInvoice,
     TransactionPending,
-    TransactionState};
+    TransactionState
+};
 
 class PostFinanceCheckoutTransactionService
 {
@@ -82,6 +83,9 @@ class PostFinanceCheckoutTransactionService
         $transactionPayload->setSuccessUrl($successUrl);
         $transactionPayload->setFailedUrl($failedUrl);
 
+        $orderNr = PostFinanceCheckoutHelper::getNextOrderNr();
+        $transactionPayload->setMerchantReference($orderNr);
+
         $createdTransaction = $this->apiClient->getTransactionService()->create($this->spaceId, $transactionPayload);
 
         return $createdTransaction;
@@ -108,8 +112,7 @@ class PostFinanceCheckoutTransactionService
 
         if ($createOrderAfterPayment === 1) {
             $orderId = null;
-            $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
-            $orderNr = $orderHandler->createOrderNo();
+            $orderNr = PostFinanceCheckoutHelper::getNextOrderNr();
 
             $order = new \stdClass();
             $order->transaction_id = $transactionId;
@@ -136,14 +139,21 @@ class PostFinanceCheckoutTransactionService
 
             $this->createLocalPostFinanceCheckoutTransaction((string)$transactionId, (array)$order);
         }
-        $_SESSION['orderId'] = $orderId;
-        $_SESSION['nextOrderNr'] = $orderNr;
+
         $pendingTransaction->setMetaData([
             'orderId' => $orderId,
             'spaceId' => $this->spaceId,
+            'orderAfterPayment' => $createOrderAfterPayment
         ]);
 
         $pendingTransaction->setMerchantReference($orderNr);
+        $successUrl = Shop::getURL() . '/' . PostFinanceCheckoutHelper::PLUGIN_CUSTOM_PAGES['thank-you-page'][$_SESSION['cISOSprache']];
+        $failedUrl = Shop::getURL() . '/' . PostFinanceCheckoutHelper::PLUGIN_CUSTOM_PAGES['fail-page'][$_SESSION['cISOSprache']];
+
+        $pendingTransaction->setSuccessUrl($successUrl . '?tID=' . $transactionId);
+        $pendingTransaction->setFailedUrl($failedUrl . '?tID=' . $transactionId);
+
+
         $this->apiClient->getTransactionService()
             ->confirm($this->spaceId, $pendingTransaction);
 
@@ -340,7 +350,7 @@ class PostFinanceCheckoutTransactionService
                 $product->nAnzahl = 1;
                 $product->fPreis = $_SESSION['Bestellung']->fGuthabenGenutzt;
 
-                $lineItems[] = $this->createLineItemProductItem($product, true);
+                $lineItems[] = $this->createLineItemProductItem($product, true, true);
             }
         }
 
@@ -376,11 +386,23 @@ class PostFinanceCheckoutTransactionService
     {
         $localTransaction = $this->getLocalPostFinanceCheckoutTransactionById($transactionId);
         if ($localTransaction->state !== TransactionState::FULFILL) {
-            $_SESSION['orderId'] = (int)$order->kBestellung;
+            $orderId = (int)$order->kBestellung;
+
+            if ($orderId === 0) {
+                return;
+            }
             $this->updateTransactionStatus($transactionId, TransactionState::FULFILL);
 
             $portalTransaction = $this->getTransactionFromPortal($transactionId);
             if ($portalTransaction->getState() === TransactionState::FULFILL) {
+                // tzahlungseingang - table name of incomming payments
+                // kBestellung - table field which represents order ID
+                $incommingPayment = Shop::Container()->getDB()->selectSingleRow('tzahlungseingang', 'kBestellung', $orderId);
+                // We check if there's record for incomming payment for current order
+                if (!empty($incommingPayment->kZahlungseingang)) {
+                    return;
+                }
+
                 $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
                 $moduleId = $paymentMethodEntity->cModulId ?? '';
                 $paymentMethod = new Method($moduleId);
@@ -396,25 +418,25 @@ class PostFinanceCheckoutTransactionService
     }
 
     /**
-     * @return void
+     * @param int $transactionId
+     * @return int
      */
-    public function createOrderAfterPayment(): void
+    public function createOrderAfterPayment(int $transactionId): int
     {
         $_SESSION['finalize'] = true;
         $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
-        $order = $orderHandler->finalizeOrder($_SESSION['nextOrderNr']);
-        $orderData = $order->fuelleBestellung(true);
-        $_SESSION['orderData'] = $orderData;
+        $orderNr = $orderHandler->createOrderNo();
+        $order = $orderHandler->finalizeOrder($orderNr);
 
-        $transactionId = $_SESSION['transactionId'] ?? null;
-
-        if ($transactionId) {
-            $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED, (int)$order->kBestellung);
-            $transaction = $this->getTransactionFromPortal($transactionId);
-            if ($transaction->getState() === TransactionState::FULFILL) {
-                $this->addIncommingPayment((string)$transactionId, $orderData, $transaction);
-            }
+        $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED, (int)$order->kBestellung);
+        $transaction = $this->getTransactionFromPortal($transactionId);
+        if ($transaction->getState() === TransactionState::FULFILL) {
+            // fuelleBestellung - JTL5 native function to append all required data to order
+            $orderData = $order->fuelleBestellung(true);
+            $this->addIncommingPayment((string)$transactionId, $orderData, $transaction);
         }
+
+        return (int)$order->kBestellung;
     }
 
     /**
@@ -428,8 +450,19 @@ class PostFinanceCheckoutTransactionService
             $state = TransactionState::PROCESSING;
         }
 
-        if ($orderId === null) {
-            $orderId = $_SESSION['orderId'];
+        $data = [
+            'state' => $state,
+            'space_id' => $this->spaceId,
+            'updated_at' => date('Y-m-d H:i:s')
+        ];
+
+        $paymentMethodName = $_SESSION['possiblePaymentMethodName'];
+        if ($paymentMethodName) {
+            $data['payment_method'] = $paymentMethodName;
+        }
+
+        if ($orderId) {
+            $data['order_id'] = $orderId;
         }
 
         Shop::Container()
@@ -437,13 +470,7 @@ class PostFinanceCheckoutTransactionService
                 'postfinancecheckout_transactions',
                 ['transaction_id'],
                 [$transactionId],
-                (object)[
-                    'state' => $state,
-                    'payment_method' => $_SESSION['possiblePaymentMethodName'],
-                    'order_id' => $orderId,
-                    'space_id' => $this->spaceId,
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]
+                (object)$data
             );
     }
 
@@ -468,7 +495,7 @@ class PostFinanceCheckoutTransactionService
      * @param CartItem $productData
      * @return LineItemCreate
      */
-    private function createLineItemProductItem(CartItem $productData, $isDiscount = false): LineItemCreate
+    private function createLineItemProductItem(CartItem $productData, $isDiscount = false, $isCustomerCredit = false): LineItemCreate
     {
         $lineItem = new LineItemCreate();
         $name = \is_array($productData->cName) ? $productData->cName[$_SESSION['cISOSprache']] : $productData->cName;
@@ -488,13 +515,20 @@ class PostFinanceCheckoutTransactionService
         $lineItem->setQuantity($productData->nAnzahl);
 
         $currencyFactor = Frontend::getCurrency()->getConversionFactor();
-        // fPreis is price, nAnzahl is quantity
-        $priceDecimal = Tax::getGross(
-            $productData->fPreis * $productData->nAnzahl,
-            CartItem::getTaxRate($productData)
-        );
-        $priceDecimal *= $currencyFactor;
-        $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
+
+        if (!$isCustomerCredit) {
+            // fPreis is price, nAnzahl is quantity
+            $priceDecimal = Tax::getGross(
+                $productData->fPreis * $productData->nAnzahl,
+                CartItem::getTaxRate($productData)
+            );
+            $priceDecimal *= $currencyFactor;
+            $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
+        } else {
+            // For customer credit - do not apply taxes
+            $priceDecimal = $productData->fPreis * $productData->nAnzahl;
+            $priceDecimal = (float)number_format($priceDecimal, 2, '.', '');
+        }
 
         $type = LineItemType::PRODUCT;
         if ($isDiscount === true) {

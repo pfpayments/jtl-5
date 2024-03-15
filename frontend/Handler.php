@@ -116,9 +116,10 @@ final class Handler
             if ($createdTransactionId) {
                 $this->transactionService->updateTransaction($createdTransactionId);
             }
+
             $_SESSION['addressCheck'] = md5(json_encode((array)$_SESSION['Lieferadresse']));
-            $_SESSION['currencyCheck'] = md5(json_encode((array)$_SESSION['Warenkorb']->PositionenArr));
-            $_SESSION['lineItemsCheck'] = $_SESSION['cWaehrungName'];
+            $_SESSION['lineItemsCheck'] = md5(json_encode((array)$_SESSION['Warenkorb']->PositionenArr));
+            $_SESSION['currencyCheck'] = $_SESSION['cWaehrungName'];
         }
 
         if (!$createdTransactionId || !$arrayOfPossibleMethods) {
@@ -228,7 +229,6 @@ final class Handler
             header("Location: " . $failedUrl);
             exit;
         }
-        $this->confirmTransaction($spaceId, $createdTransactionId);
 
         // TODO create setting with options ['payment_page', 'iframe'];
         $integration = 'iframe';
@@ -248,6 +248,8 @@ final class Handler
         $_SESSION['possiblePaymentMethodId'] = $paymentMethod->getId();
         $_SESSION['possiblePaymentMethodName'] = $paymentMethod->getName();
         $_SESSION['orderData'] = $orderData;
+
+        $this->confirmTransaction($spaceId, $createdTransactionId);
 
         if ($integration == 'payment_page') {
             $redirectUrl = $this->apiClient->getTransactionPaymentPageService()

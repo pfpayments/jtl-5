@@ -7,6 +7,7 @@ use JTL\Shop;
 use JTL\Plugin\Data\Localization;
 use PostFinanceCheckout\Sdk\ApiClient;
 use JTL\Plugin\Helper as PluginHelper;
+use JTL\Checkout\Nummern;
 
 /**
  * Class PostFinanceCheckoutHelper
@@ -98,6 +99,29 @@ class PostFinanceCheckoutHelper extends Helper
 
             default:
                 return 'en_GB';
+        }
+    }
+
+    public static function getNextOrderNr(): string
+    {
+        $conf = Shop::getSettingSection(\CONF_KAUFABWICKLUNG);
+        $number = new Nummern(\JTL_GENNUMBER_ORDERNUMBER);
+        $increment = (int)($conf['bestellabschluss_bestellnummer_anfangsnummer'] ?? 1);
+        if ($number) {
+            $orderNo = $number->getNummer() + $increment;
+
+            $prefix = \str_replace(
+                ['%Y', '%m', '%d', '%W'],
+                [\date('Y'), \date('m'), \date('d'), \date('W')],
+                $conf['bestellabschluss_bestellnummer_praefix']
+            );
+            $suffix = \str_replace(
+                ['%Y', '%m', '%d', '%W'],
+                [\date('Y'), \date('m'), \date('d'), \date('W')],
+                $conf['bestellabschluss_bestellnummer_suffix']
+            );
+
+            return $prefix . $orderNo . $suffix;
         }
     }
 
