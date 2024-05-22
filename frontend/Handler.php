@@ -123,29 +123,32 @@ final class Handler
         }
 
         if (!$createdTransactionId || !$arrayOfPossibleMethods) {
-            if ($createdTransactionId) {
-                $config = PostFinanceCheckoutHelper::getConfigByID($this->plugin->getId());
-                $spaceId = $config[PostFinanceCheckoutHelper::SPACE_ID];
-                $transaction = $this->apiClient->getTransactionService()->read($spaceId, $createdTransactionId);
-                if ($transaction->getState() === TransactionState::CONFIRMED) {
-                    $_SESSION['transactionId'] = null;
-                    $createdTransactionId = $this->createTransaction();
-                    $_SESSION['transactionId'] = $createdTransactionId;
-                } else {
-                    $this->transactionService->updateTransaction($createdTransactionId);
-                }
+          if (!$createdTransactionId) {
+            $this->resetTransaction();
+          } else {
+            $config = PostFinanceCheckoutHelper::getConfigByID($this->plugin->getId());
+            $spaceId = $config[PostFinanceCheckoutHelper::SPACE_ID];
+            $transaction = $this->apiClient->getTransactionService()->read($spaceId, $createdTransactionId);
+            
+            $failedStates = [
+              TransactionState::DECLINE,
+              TransactionState::FAILED,
+              TransactionState::VOIDED,
+            ];
+            
+            if (empty($transaction) || empty($transaction->getVersion()) || in_array($transaction->getState(), $failedStates)) {
+              $this->resetTransaction();
             } else {
-                $_SESSION['transactionId'] = null;
-                $createdTransactionId = $this->createTransaction();
-                $_SESSION['transactionId'] = $createdTransactionId;
+              $this->transactionService->updateTransaction($createdTransactionId);
             }
-
-            $possiblePaymentMethods = $this->fetchPossiblePaymentMethods((string)$createdTransactionId);
-            $arrayOfPossibleMethods = [];
-            foreach ($possiblePaymentMethods as $possiblePaymentMethod) {
-                $arrayOfPossibleMethods[] = PostFinanceCheckoutHelper::PAYMENT_METHOD_PREFIX . '_' . $possiblePaymentMethod->getId();
-            }
-            $_SESSION['arrayOfPossibleMethods'] = $arrayOfPossibleMethods;
+          }
+      
+          $possiblePaymentMethods = $this->fetchPossiblePaymentMethods((string)$createdTransactionId);
+          $arrayOfPossibleMethods = [];
+          foreach ($possiblePaymentMethods as $possiblePaymentMethod) {
+              $arrayOfPossibleMethods[] = PostFinanceCheckoutHelper::PAYMENT_METHOD_PREFIX . '_' . $possiblePaymentMethod->getId();
+          }
+          $_SESSION['arrayOfPossibleMethods'] = $arrayOfPossibleMethods;
         }
     }
 
@@ -213,8 +216,22 @@ final class Handler
      */
     public function confirmTransaction(string $spaceId, int $transactionId): void
     {
-        $transaction = $this->apiClient->getTransactionService()->read($spaceId, $transactionId);
-        $this->transactionService->confirmTransaction($transaction);
+      $transaction = $this->apiClient->getTransactionService()->read($spaceId, $transactionId);
+      
+      $failedStates = [
+        TransactionState::DECLINE,
+        TransactionState::FAILED,
+        TransactionState::VOIDED,
+      ];
+
+      if (empty($transaction) || empty($transaction->getVersion()) || in_array($transaction->getState(), $failedStates)) {
+        $_SESSION['transactionId'] = null;
+        $linkHelper = Shop::Container()->getLinkService();
+        \header('Location: ' . $linkHelper->getStaticRoute('bestellvorgang.php') . '?editZahlungsart=1');
+        exit;
+      }
+      
+      $this->transactionService->confirmTransaction($transaction);
     }
 
     public function getRedirectUrlAfterCreatedTransaction($orderData): string
@@ -297,5 +314,15 @@ final class Handler
             pq('head')->append($paymentMethodsCss);
         }
     }
+	
+	/**
+	 * @return void
+	 */
+	private function resetTransaction(): void
+	{
+		$_SESSION['transactionId'] = null;
+		$createdTransactionId = $this->createTransaction();
+		$_SESSION['transactionId'] = $createdTransactionId;
+	}
 
 }

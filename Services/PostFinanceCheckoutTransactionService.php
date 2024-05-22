@@ -2,6 +2,7 @@
 
 namespace Plugin\jtl_postfinancecheckout\Services;
 
+use JTL\Alert\Alert;
 use JTL\Cart\CartItem;
 use JTL\Catalog\Product\Preise;
 use JTL\Checkout\Bestellung;
@@ -44,12 +45,18 @@ class PostFinanceCheckoutTransactionService
      * @var $spaceViewId
      */
     protected $spaceViewId;
+ 
+    /**
+     * @var $plugin
+     */
+    protected $plugin;
 
     public function __construct(ApiClient $apiClient, $plugin)
     {
         $config = PostFinanceCheckoutHelper::getConfigByID($plugin->getId());
         $spaceId = $config[PostFinanceCheckoutHelper::SPACE_ID];
 
+        $this->plugin = $plugin;
         $this->apiClient = $apiClient;
         $this->spaceId = $spaceId;
         $this->spaceViewId = $config[PostFinanceCheckoutHelper::SPACE_VIEW_ID];
@@ -80,8 +87,14 @@ class PostFinanceCheckoutTransactionService
         $successUrl = Shop::getURL() . '/' . PostFinanceCheckoutHelper::PLUGIN_CUSTOM_PAGES['thank-you-page'][$_SESSION['cISOSprache']];
         $failedUrl = Shop::getURL() . '/' . PostFinanceCheckoutHelper::PLUGIN_CUSTOM_PAGES['fail-page'][$_SESSION['cISOSprache']];
 
-        $transactionPayload->setSuccessUrl($successUrl);
-        $transactionPayload->setFailedUrl($failedUrl);
+        $customer = $_SESSION['Kunde'];
+        $customerEmail = $customer->cMail ?? '';
+        $customerId = $customer->kKunde ?? '';
+
+        $transactionPayload->setSuccessUrl($successUrl)
+          ->setFailedUrl($failedUrl)
+          ->setCustomerEmailAddress($customerEmail)
+          ->setCustomerId($customerId);
 
         $orderNr = PostFinanceCheckoutHelper::getNextOrderNr();
         $transactionPayload->setMerchantReference($orderNr);
@@ -169,15 +182,30 @@ class PostFinanceCheckoutTransactionService
     public function updateTransaction(int $transactionId)
     {
         $pendingTransaction = new TransactionPending();
-        $pendingTransaction->setId($transactionId);
-
         $transaction = $this->getTransactionFromPortal($transactionId);
-        if (empty($transaction) || empty($transaction->getVersion())) {
-            $_SESSION['transactionId'] = null;
-            $createdTransactionId = $this->createTransaction();
-            $_SESSION['transactionId'] = $createdTransactionId;
-            return;
+        $failedStates = [
+          TransactionState::DECLINE,
+          TransactionState::FAILED,
+          TransactionState::VOIDED,
+        ];
+        if (empty($transaction) || empty($transaction->getVersion()) || in_array($transaction->getState(), $failedStates)) {
+          $_SESSION['transactionId'] = null;
+          $translations = PostFinanceCheckoutHelper::getTranslations($this->plugin->getLocalization(), [
+            'jtl_postfinancecheckout_transaction_timeout',
+          ]);
+          
+          Shop::Container()->getAlertService()->addAlert(
+            Alert::TYPE_ERROR,
+            $translations['jtl_postfinancecheckout_transaction_timeout'],
+            'updateTransaction_transaction_timeout'
+          );
+          
+          $linkHelper = Shop::Container()->getLinkService();
+          \header('Location: ' . $linkHelper->getStaticRoute('bestellvorgang.php') . '?editZahlungsart=1');
+          exit;
         }
+	    
+        $pendingTransaction->setId($transactionId);
         $pendingTransaction->setVersion($transaction->getVersion());
 
         $lineItems = $this->getLineItems($_SESSION['Warenkorb']->PositionenArr);
@@ -587,11 +615,32 @@ class PostFinanceCheckoutTransactionService
         $billingAddress->setPostalState($customer->cBundesland);
         $billingAddress->setOrganizationName($customer->cFirma);
         $billingAddress->setPhoneNumber($customer->cMobil);
-        $billingAddress->setSalutation($customer->cTitel);
+        
+        $company = $customer->cFirma ?? null;
+        if ($company) {
+            $billingAddress->setOrganizationName($company);
+        }
+        
+        $mobile = $customer->cMobil ?? null;
+        if ($mobile) {
+            $billingAddress->setMobilePhoneNumber($mobile);
+        }
+        
+        $phone = $customer->cTel ?? $mobile;
+        if ($phone) {
+            $billingAddress->setPhoneNumber($phone);
+        }
+        
+        $birthDate = $customer->dGeburtstag_formatted ?? null;
+        if ($birthDate) {
+            $birthday = new \DateTime();
+            $birthday->setTimestamp(strtotime($birthDate));
+            $birthday = $birthday->format('Y-m-d');
+            $billingAddress->setDateOfBirth($birthday);
+        }
 
-        $gender = $_SESSION['orderData']?->oKunde?->cAnrede ?? null;
+        $gender = $_SESSION['orderData']?->oKunde?->cAnrede ?? '';
         if ($gender !== null) {
-
             $billingAddress->setGender($gender === 'm' ? Gender::MALE : Gender::FEMALE);
             $billingAddress->setSalutation($gender === 'm' ? 'Mr' : 'Ms');
         }

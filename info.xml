@@ -9,9 +9,16 @@
     <Icon>logo.jpg</Icon>
     <PluginID>jtl_postfinancecheckout</PluginID>
     <CreateDate>2023-05-29</CreateDate>
-    <Version>1.0.24</Version>
+    <Version>1.0.25</Version>
     <Install>
         <Locales>
+            <Variable>
+                <Name>jtl_postfinancecheckout_transaction_timeout</Name>
+                <VariableLocalized iso="GER">Die Transaktion ist abgelaufen</VariableLocalized>
+                <VariableLocalized iso="ENG">Transaction was expired</VariableLocalized>
+                <VariableLocalized iso="ITA">La transazione era scaduta</VariableLocalized>
+                <VariableLocalized iso="FRE">La transaction a expiré</VariableLocalized>
+            </Variable>
             <Variable>
                 <Name>jtl_postfinancecheckout_cancel</Name>
                 <VariableLocalized iso="GER">Stornieren</VariableLocalized>
