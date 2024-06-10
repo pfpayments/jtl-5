@@ -101,14 +101,18 @@ class PostFinanceCheckoutHelper extends Helper
                 return 'en_GB';
         }
     }
-
-    public static function getNextOrderNr(): string
+    
+    /**
+     * @param $extraIncrement - we are formatting temporal possible order number, so increment is needed if we need next possible order number
+     * @return array
+     */
+    public static function getNextOrderNr($extraIncrement = 0): array
     {
         $conf = Shop::getSettingSection(\CONF_KAUFABWICKLUNG);
         $number = new Nummern(\JTL_GENNUMBER_ORDERNUMBER);
         $increment = (int)($conf['bestellabschluss_bestellnummer_anfangsnummer'] ?? 1);
         if ($number) {
-            $orderNo = $number->getNummer() + $increment;
+            $orderNo = $number->getNummer() + $increment + $extraIncrement;
 
             $prefix = \str_replace(
                 ['%Y', '%m', '%d', '%W'],
@@ -121,7 +125,7 @@ class PostFinanceCheckoutHelper extends Helper
                 $conf['bestellabschluss_bestellnummer_suffix']
             );
 
-            return $prefix . $orderNo . $suffix;
+            return [$prefix . $orderNo . $suffix, $orderNo];
         }
     }
 

@@ -4,6 +4,7 @@ namespace Plugin\jtl_postfinancecheckout\Services;
 
 use JTL\Alert\Alert;
 use JTL\Cart\CartItem;
+use JTL\Checkout\Nummern;
 use JTL\Catalog\Product\Preise;
 use JTL\Checkout\Bestellung;
 use JTL\Checkout\OrderHandler;
@@ -17,7 +18,8 @@ use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 use stdClass;
 use PostFinanceCheckout\Sdk\ApiClient;
-use PostFinanceCheckout\Sdk\Model\{AddressCreate,
+use PostFinanceCheckout\Sdk\Model\{
+    AddressCreate,
     Gender,
     LineItemCreate,
     LineItemType,
@@ -26,7 +28,18 @@ use PostFinanceCheckout\Sdk\Model\{AddressCreate,
     TransactionCreate,
     TransactionInvoice,
     TransactionPending,
-    TransactionState
+    TransactionState,
+    CreationEntityState,
+    CriteriaOperator,
+    EntityQuery,
+    EntityQueryFilter,
+    EntityQueryFilterType,
+    RefundState,
+    TransactionInvoiceState,
+    WebhookListener,
+    WebhookListenerCreate,
+    WebhookUrl,
+    WebhookUrlCreate,
 };
 
 class PostFinanceCheckoutTransactionService
@@ -96,9 +109,6 @@ class PostFinanceCheckoutTransactionService
           ->setCustomerEmailAddress($customerEmail)
           ->setCustomerId($customerId);
 
-        $orderNr = PostFinanceCheckoutHelper::getNextOrderNr();
-        $transactionPayload->setMerchantReference($orderNr);
-
         $createdTransaction = $this->apiClient->getTransactionService()->create($this->spaceId, $transactionPayload);
 
         return $createdTransaction;
@@ -122,10 +132,19 @@ class PostFinanceCheckoutTransactionService
 
         $obj = Shop::Container()->getDB()->selectSingleRow('tzahlungsart', 'kZahlungsart', (int)$_SESSION['AktiveZahlungsart']);
         $createOrderAfterPayment = (int)$obj->nWaehrendBestellung ?? 1;
-
+        
+        $orderNumber = null;
         if ($createOrderAfterPayment === 1) {
             $orderId = null;
-            $orderNr = PostFinanceCheckoutHelper::getNextOrderNr();
+            [$orderNr, $orderNumber] = PostFinanceCheckoutHelper::getNextOrderNr();
+            $transactionByOrderReference = $this->getTransactionByOrderReference($orderNr);
+            
+            if ($transactionByOrderReference) {
+                [$orderNr, $orderNumber] = PostFinanceCheckoutHelper::getNextOrderNr(1);
+                $pendingTransaction->setVersion($transaction->getVersion() + 1);
+                $pendingTransaction->setMerchantReference($orderNr);
+                $this->apiClient->getTransactionService()->update($this->spaceId, $pendingTransaction);
+            }
 
             $order = new \stdClass();
             $order->transaction_id = $transactionId;
@@ -136,7 +155,6 @@ class PostFinanceCheckoutTransactionService
             $order->state = TransactionState::PENDING;
             $order->created_at = date('Y-m-d H:i:s');
             $this->createLocalPostFinanceCheckoutTransaction((string)$transactionId, (array)$order);
-
         } else {
             $orderId = $_SESSION['kBestellung'] ?? $_SESSION['oBesucher']->kBestellung;
             $orderNr = $_SESSION['BestellNr'] ?? $_SESSION['nextOrderNr'];
@@ -156,7 +174,8 @@ class PostFinanceCheckoutTransactionService
         $pendingTransaction->setMetaData([
             'orderId' => $orderId,
             'spaceId' => $this->spaceId,
-            'orderAfterPayment' => $createOrderAfterPayment
+            'orderAfterPayment' => $createOrderAfterPayment,
+            'order_nr' => $orderNr
         ]);
 
         $pendingTransaction->setMerchantReference($orderNr);
@@ -171,8 +190,60 @@ class PostFinanceCheckoutTransactionService
             ->confirm($this->spaceId, $pendingTransaction);
 
         if ($createOrderAfterPayment === 1) {
+            $number = new Nummern(\JTL_GENNUMBER_ORDERNUMBER);
+            $number->setNummer($orderNumber);
+            $number->update();
             $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId);
         }
+    }
+    
+    /**
+     * @param string $orderNr
+     * @return array
+     */
+    protected function getTransactionByOrderReference(string $orderNr): array
+    {
+        $states = [
+          TransactionState::CONFIRMED,
+          TransactionState::PROCESSING,
+          TransactionState::FULFILL,
+        ];
+        
+        $filters = array_map(function($state) use ($orderNr) {
+            return (new EntityQueryFilter())
+              ->setType(EntityQueryFilterType::_AND)
+              ->setChildren([
+                $this->getEntityFilter('state', $state),
+                $this->getEntityFilter('merchantReference', $orderNr),
+              ]);
+        }, $states);
+        
+        $entityQueryFilter = (new EntityQueryFilter())
+          ->setType(EntityQueryFilterType::_OR)
+          ->setChildren($filters);
+        
+        $query = (new EntityQuery())->setFilter($entityQueryFilter);
+        
+        return $this->apiClient->getTransactionService()->search($this->spaceId, $query);
+    }
+    
+    /**
+     * Creates and returns a new entity filter.
+     *
+     * @param string $fieldName
+     * @param        $value
+     * @param string $operator
+     *
+     * @return \PostFinanceCheckout\Sdk\Model\EntityQueryFilter
+     */
+    protected function getEntityFilter(string $fieldName, $value, string $operator = CriteriaOperator::EQUALS): EntityQueryFilter
+    {
+        /** @noinspection PhpParamsInspection */
+        return (new EntityQueryFilter())
+          ->setType(EntityQueryFilterType::LEAF)
+          ->setOperator($operator)
+          ->setFieldName($fieldName)
+          ->setValue($value);
     }
 
     /**
@@ -452,12 +523,15 @@ class PostFinanceCheckoutTransactionService
     public function createOrderAfterPayment(int $transactionId): int
     {
         $_SESSION['finalize'] = true;
-        $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
-        $orderNr = $orderHandler->createOrderNo();
-        $order = $orderHandler->finalizeOrder($orderNr);
-
-        $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED, (int)$order->kBestellung);
+        
         $transaction = $this->getTransactionFromPortal($transactionId);
+        
+        $orderNr = $transaction->getMetaData()['order_nr'];
+        $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
+        
+        $order = $orderHandler->finalizeOrder($orderNr);
+        $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED, (int)$order->kBestellung);
+
         if ($transaction->getState() === TransactionState::FULFILL) {
             // fuelleBestellung - JTL5 native function to append all required data to order
             $orderData = $order->fuelleBestellung(true);
