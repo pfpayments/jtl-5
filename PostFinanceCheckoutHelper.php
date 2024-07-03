@@ -25,7 +25,10 @@ class PostFinanceCheckoutHelper extends Helper
     const SPACE_ID = 'jtl_postfinancecheckout_space_id';
     const APPLICATION_KEY = 'jtl_postfinancecheckout_application_key';
     const SPACE_VIEW_ID = 'jtl_postfinancecheckout_space_view_id';
+    const SEND_AUTHORIZATION_EMAIL = 'jtl_postfinancecheckout_send_authorization_email';
+    const SEND_FULFILL_EMAIL = 'jtl_postfinancecheckout_send_fulfill_email';
     const SEND_CONFIRMATION_EMAIL = 'jtl_postfinancecheckout_send_confirmation_email';
+    const PREVENT_FROM_DUPLICATED_ORDERS = 'jtl_postfinancecheckout_prevent_from_duplicated_orders';
 
     const PAYMENT_METHOD_CONFIGURATION = 'PaymentMethodConfiguration';
     const REFUND = 'Refund';
@@ -99,33 +102,6 @@ class PostFinanceCheckoutHelper extends Helper
 
             default:
                 return 'en_GB';
-        }
-    }
-    
-    /**
-     * @param $extraIncrement - we are formatting temporal possible order number, so increment is needed if we need next possible order number
-     * @return array
-     */
-    public static function getNextOrderNr($extraIncrement = 0): array
-    {
-        $conf = Shop::getSettingSection(\CONF_KAUFABWICKLUNG);
-        $number = new Nummern(\JTL_GENNUMBER_ORDERNUMBER);
-        $increment = (int)($conf['bestellabschluss_bestellnummer_anfangsnummer'] ?? 1);
-        if ($number) {
-            $orderNo = $number->getNummer() + $increment + $extraIncrement;
-
-            $prefix = \str_replace(
-                ['%Y', '%m', '%d', '%W'],
-                [\date('Y'), \date('m'), \date('d'), \date('W')],
-                $conf['bestellabschluss_bestellnummer_praefix']
-            );
-            $suffix = \str_replace(
-                ['%Y', '%m', '%d', '%W'],
-                [\date('Y'), \date('m'), \date('d'), \date('W')],
-                $conf['bestellabschluss_bestellnummer_suffix']
-            );
-
-            return [$prefix . $orderNo . $suffix, $orderNo];
         }
     }
 
@@ -221,6 +197,51 @@ class PostFinanceCheckoutHelper extends Helper
             }
             return null;
         }
+    }
+    
+    /**
+     * @param $update
+     * @param $lastOrderNo
+     * @return array
+     *
+     * This is edited JTL native function.
+     */
+    public static function createOrderNo($update = true, $lastOrderNo = 0): array
+    {
+        $conf      = Shop::getSettingSection(\CONF_KAUFABWICKLUNG);
+        $number    = new Nummern(\JTL_GENNUMBER_ORDERNUMBER);
+        $orderNo   = 1;
+        $increment = (int)($conf['bestellabschluss_bestellnummer_anfangsnummer'] ?? 1);
+        if ($number) {
+            $orderNo = $number->getNummer() + $increment;
+            $number->setNummer($number->getNummer() + 1);
+            if ($update === true) {
+                // This part is used when setting Prevent From Duplicated Order No === 'NO'. We increase order number only once (even multiple orders with same nr are completed
+                // Example: setting is set to No, we accept duplicated order no. Two customers are making order with no Order 1. If both finishes the payment, next order will be Order 2, not Order 2 and Order 3
+                if ($lastOrderNo === 0 || $orderNo - $lastOrderNo === 0) {
+                    $number->update();
+                }
+            }
+        }
+        
+        /*
+        *   %Y = -aktuelles Jahr
+        *   %m = -aktueller Monat
+        *   %d = -aktueller Tag
+        *   %W = -aktuelle KW
+        */
+        $prefix = \str_replace(
+          ['%Y', '%m', '%d', '%W'],
+          [\date('Y'), \date('m'), \date('d'), \date('W')],
+          $conf['bestellabschluss_bestellnummer_praefix']
+        );
+        $suffix = \str_replace(
+          ['%Y', '%m', '%d', '%W'],
+          [\date('Y'), \date('m'), \date('d'), \date('W')],
+          $conf['bestellabschluss_bestellnummer_suffix']
+        );
+        
+        return [$prefix . $orderNo . $suffix, $orderNo];
     }
 }
 

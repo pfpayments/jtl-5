@@ -9,7 +9,7 @@
     <Icon>logo.jpg</Icon>
     <PluginID>jtl_postfinancecheckout</PluginID>
     <CreateDate>2023-05-29</CreateDate>
-    <Version>1.0.26</Version>
+    <Version>1.0.27</Version>
     <Install>
         <Locales>
             <Variable>
@@ -404,16 +404,17 @@
                     <Description></Description>
                 </Setting>
                 <Name>Plugin Configuration</Name>
-                <Setting type="text" initialValue="" sort="1" conf="Y">
-                    <Name>User ID</Name>
-                    <Description>User ID Description</Description>
-                    <ValueName>jtl_postfinancecheckout_user_id</ValueName>
-                </Setting>
 
-                <Setting type="text" initialValue="" sort="2" conf="Y">
+                <Setting type="text" initialValue="" sort="1" conf="Y">
                     <Name>Space ID</Name>
                     <Description>Space ID Description</Description>
                     <ValueName>jtl_postfinancecheckout_space_id</ValueName>
+                </Setting>
+
+                <Setting type="text" initialValue="" sort="2" conf="Y">
+                    <Name>User ID</Name>
+                    <Description>User ID Description</Description>
+                    <ValueName>jtl_postfinancecheckout_user_id</ValueName>
                 </Setting>
 
                 <Setting type="text" initialValue="" sort="3" conf="Y">
@@ -429,11 +430,31 @@
                 </Setting>
 
                 <Setting type="selectbox" initialValue="YES" sort="5" conf="Y">
-                    <Name>Send Confirmation Email</Name>
-                    <ValueName>jtl_postfinancecheckout_send_confirmation_email</ValueName>
+                    <Name>Send Authorization Email</Name>
+                    <Description>Send email when the payment is authorized.</Description>
+                    <ValueName>jtl_postfinancecheckout_send_authorization_email</ValueName>
                     <SelectboxOptions>
                         <Option value="YES" sort="0">Yes</Option>
                         <Option value="NO" sort="1">No</Option>
+                    </SelectboxOptions>
+                </Setting>
+
+                <Setting type="selectbox" initialValue="NO" sort="6" conf="Y">
+                    <Name>Send Fullfil Email</Name>
+                    <Description>Send email when the order payment is completed.</Description>
+                    <ValueName>jtl_postfinancecheckout_send_fulfill_email</ValueName>
+                    <SelectboxOptions>
+                        <Option value="YES" sort="0">Yes</Option>
+                        <Option value="NO" sort="1">No</Option>
+                    </SelectboxOptions>
+                </Setting>
+
+                <Setting type="selectbox" initialValue="YES" sort="7" conf="Y">
+                    <Name>Prevent From Duplicated Order No</Name>
+                    <ValueName>jtl_postfinancecheckout_prevent_from_duplicated_orders</ValueName>
+                    <SelectboxOptions>
+                        <Option value="NO" sort="0">No</Option>
+                        <Option value="YES" sort="1">Yes</Option>
                     </SelectboxOptions>
                 </Setting>
             </Settingslink>

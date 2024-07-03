@@ -61,6 +61,7 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
             case TransactionState::FULFILL:
                 $order = new Bestellung($orderId);
                 $this->transactionService->addIncommingPayment((string)$transactionId, $order, $transaction);
+                $this->transactionService->sendEmail($orderId, 'fulfill');
                 break;
 
             case TransactionState::PROCESSING:
@@ -70,9 +71,6 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
 
             case TransactionState::AUTHORIZED:
                 $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
-                if ($orderId && $this->isSendConfirmationEmail()) {
-                    $this->sendConfirmationMail($orderId);
-                }
                 break;
 
             case TransactionState::DECLINE:
@@ -88,45 +86,6 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
                 $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
                 print 'Order ' . $orderId . ' status was updated to cancelled';
                 break;
-        }
-    }
-
-    private function isSendConfirmationEmail()
-    {
-        $config = PostFinanceCheckoutHelper::getConfigByID($this->plugin->getId());
-        $sendConfirmationEmail = $config[PostFinanceCheckoutHelper::SEND_CONFIRMATION_EMAIL] ?? null;
-
-        return $sendConfirmationEmail === 'YES';
-    }
-
-    /**
-     * @param int $orderId
-     * @return void
-     */
-    private function sendConfirmationMail(int $orderId): void
-    {
-        Shop::Container()
-            ->getDB()->update(
-                'postfinancecheckout_transactions',
-                ['order_id'],
-                [$orderId],
-                (object)[
-                    'confirmation_email_sent' => 1,
-                    'updated_at' => date('Y-m-d H:i:s')
-                ]
-            );
-
-        $order = new Bestellung($orderId);
-        $order->fuelleBestellung(false);
-        $customer = new Customer($order->kKunde);
-        $data = new stdClass();
-        $mailer = Shop::Container()->get(Mailer::class);
-        $mail = new Mail();
-
-        $data->tkunde = $customer;
-        $data->tbestellung = $order;
-        if ($customer->cMail !== '') {
-            $mailer->send($mail->createFromTemplateID(\MAILTEMPLATE_BESTELLBESTAETIGUNG, $data));
         }
     }
 }

@@ -10,11 +10,11 @@ class PostFinanceCheckoutOrderService
 	public function updateOrderStatus($orderId, $currentStatus, $newStatus)
 	{
 		return Shop::Container()
-		  ->getDB()->update(
-			'tbestellung',
-			['kBestellung', 'cStatus'],
-			[$orderId, $currentStatus],
-			(object)['cStatus' => $newStatus]
-		  );
+		    ->getDB()->update(
+			    'tbestellung',
+			    ['kBestellung', 'cStatus'],
+			    [$orderId, $currentStatus],
+			    (object)['cStatus' => $newStatus]
+		    );
 	}
 }

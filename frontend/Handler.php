@@ -130,13 +130,14 @@ final class Handler
             $spaceId = $config[PostFinanceCheckoutHelper::SPACE_ID];
             $transaction = $this->apiClient->getTransactionService()->read($spaceId, $createdTransactionId);
             
-            $failedStates = [
+          $statesToUpdate = [
               TransactionState::DECLINE,
               TransactionState::FAILED,
               TransactionState::VOIDED,
+              TransactionState::PROCESSING
             ];
             
-            if (empty($transaction) || empty($transaction->getVersion()) || in_array($transaction->getState(), $failedStates)) {
+            if (empty($transaction) || empty($transaction->getVersion()) || in_array($transaction->getState(), $statesToUpdate)) {
               $this->resetTransaction();
             } else {
               $this->transactionService->updateTransaction($createdTransactionId);
@@ -218,13 +219,14 @@ final class Handler
     {
       $transaction = $this->apiClient->getTransactionService()->read($spaceId, $transactionId);
       
-      $failedStates = [
+     $statesToUpdate = [
         TransactionState::DECLINE,
         TransactionState::FAILED,
         TransactionState::VOIDED,
-      ];
+        TransactionState::PROCESSING
+     ];
 
-      if (empty($transaction) || empty($transaction->getVersion()) || in_array($transaction->getState(), $failedStates)) {
+      if (empty($transaction) || empty($transaction->getVersion()) || in_array($transaction->getState(), $statesToUpdate)) {
         $_SESSION['transactionId'] = null;
         $linkHelper = Shop::Container()->getLinkService();
         \header('Location: ' . $linkHelper->getStaticRoute('bestellvorgang.php') . '?editZahlungsart=1');
