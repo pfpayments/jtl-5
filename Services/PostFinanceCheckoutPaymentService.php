@@ -35,6 +35,7 @@ class PostFinanceCheckoutPaymentService
 	  'fr-FR' => 'fre',
 	  'it-IT' => 'ita',
 	  'en-US' => 'eng',
+	  'es-ES' => 'spa',
 	];
 
 	/**

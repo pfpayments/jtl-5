@@ -61,7 +61,6 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
             case TransactionState::FULFILL:
                 $order = new Bestellung($orderId);
                 $this->transactionService->addIncommingPayment((string)$transactionId, $order, $transaction);
-                $this->transactionService->sendEmail($orderId, 'fulfill');
                 break;
 
             case TransactionState::PROCESSING:

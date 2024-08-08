@@ -530,6 +530,10 @@ class PostFinanceCheckoutTransactionService
                 $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
                 $incomingPayment->cHinweis = $transactionId;
                 $paymentMethod->addIncomingPayment($order, $incomingPayment);
+                
+                // At this stage, the transaction goes directly to fulfill, so it's also authorized.
+                // Even when the sendEmail is invoked here, the email will be or not sent according to several conditions.
+                $this->sendEmail($orderId, 'fulfill');
             }
         }
     }
@@ -565,13 +569,13 @@ class PostFinanceCheckoutTransactionService
             if ($data !== null && isset($data->kBestellung)) {
                 $order = new Bestellung((int)$data->kBestellung);
             } else {
-                $order = $orderHandler->finalizeOrder($orderNr);
+                $order = $orderHandler->finalizeOrder($orderNr, false);
             }
         } else {
             // Updates order number for next order. Increase by 1 if is needed
             $lastOrderNo = $transaction->getMetaData()['order_no'];
             PostFinanceCheckoutHelper::createOrderNo(true, $lastOrderNo);
-            $order = $orderHandler->finalizeOrder($orderNr);
+            $order = $orderHandler->finalizeOrder($orderNr, false);
         }
         $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED, (int)$order->kBestellung);
 
@@ -617,6 +621,10 @@ class PostFinanceCheckoutTransactionService
                 [$transactionId],
                 (object)$data
             );
+        
+        if ($orderId && $state === TransactionState::AUTHORIZED) {
+            $this->sendEmail($orderId, 'authorization');
+        }
     }
 
     private function downloadDocument($document)
@@ -656,16 +664,16 @@ class PostFinanceCheckoutTransactionService
             $uniqueName = $uniqueName . '_' . rand(1, 99999);
         } elseif ($attributes) {
             foreach ($attributes as $attribute) {
-                if ($attribute->cTyp !== 'TEXT') {
+                if ($attribute->cTyp !== 'FREIFELD') {
                     continue;
                 }
                 
                 // If there's custom attribute with type TEXT (for example merchant adds his name to be printed on Jacket)
                 // them this custom text will be slugified and added to unique id
-                // kEigenschaft - mean characteristis, attribute name
-                // kEigenschaftWert - mean characteristis value, attribute value
-                $attributeName = $attribute->kEigenschaft;
-                $attributeValue = $this->slugify((string)$attribute->kEigenschaftWert);
+                // cEigenschaftName - array of attribute name by language
+                // cEigenschaftWertName - array of attribute values by language
+                $attributeName = strtolower(current($attribute->cEigenschaftName));
+                $attributeValue = strtolower($this->slugify((string)current($attribute->cEigenschaftWertName)));
                 $uniqueName .= '_' . $attributeName . '_' . $attributeValue;
             }
         }

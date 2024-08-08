@@ -9,7 +9,7 @@
     <Icon>logo.jpg</Icon>
     <PluginID>jtl_postfinancecheckout</PluginID>
     <CreateDate>2023-05-29</CreateDate>
-    <Version>1.0.27</Version>
+    <Version>1.0.28</Version>
     <Install>
         <Locales>
             <Variable>
@@ -449,7 +449,17 @@
                     </SelectboxOptions>
                 </Setting>
 
-                <Setting type="selectbox" initialValue="YES" sort="7" conf="Y">
+                <Setting type="selectbox" initialValue="NO" sort="7" conf="Y">
+                    <Name>Send Fullfil Email</Name>
+                    <Description>Send email when the order payment is completed.</Description>
+                    <ValueName>jtl_postfinancecheckout_send_fulfill_email</ValueName>
+                    <SelectboxOptions>
+                        <Option value="YES" sort="0">Yes</Option>
+                        <Option value="NO" sort="1">No</Option>
+                    </SelectboxOptions>
+                </Setting>
+
+                <Setting type="selectbox" initialValue="NO" sort="8" conf="Y">
                     <Name>Prevent From Duplicated Order No</Name>
                     <ValueName>jtl_postfinancecheckout_prevent_from_duplicated_orders</ValueName>
                     <SelectboxOptions>
