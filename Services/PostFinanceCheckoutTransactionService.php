@@ -97,7 +97,8 @@ class PostFinanceCheckoutTransactionService
     public function createTransaction(Bestellung $order): Transaction
     {
         $transactionPayload = new TransactionCreate();
-        $transactionPayload->setCurrency($_SESSION['cWaehrungName']);
+        $currency = $_SESSION['Waehrung']->getCode() ?? $_SESSION['cWaehrungName'];
+        $transactionPayload->setCurrency($currency);
         $transactionPayload->setLanguage(PostFinanceCheckoutHelper::getLanguageString());
         $transactionPayload->setLineItems($this->getLineItems($order->Positionen));
         $transactionPayload->setBillingAddress($this->createBillingAddress());
