@@ -2,12 +2,12 @@
   "repositories": [
     {
       "type": "vcs",
-      "url": "https://github.com/wallee-payment/php-sdk"
+      "url": "https://github.com/pfpayments/php-sdk"
     }
   ],
   "autoload": {
     "psr-4": {
-      "WalleePayment\\": "Wallee/"
+      "PostFinanceCheckoutPayment\\": "PostFinanceCheckout/"
     }
   },
   "require": {
