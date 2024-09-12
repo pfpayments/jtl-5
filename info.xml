@@ -9,7 +9,7 @@
     <Icon>logo.jpg</Icon>
     <PluginID>jtl_postfinancecheckout</PluginID>
     <CreateDate>2023-05-29</CreateDate>
-    <Version>1.0.29</Version>
+    <Version>1.0.30</Version>
     <Install>
         <Locales>
             <Variable>

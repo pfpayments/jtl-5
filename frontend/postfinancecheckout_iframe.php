@@ -1,5 +1,6 @@
 <?php declare(strict_types=1);
 
+use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 
 /** @global \JTL\Smarty\JTLSmarty $smarty */
