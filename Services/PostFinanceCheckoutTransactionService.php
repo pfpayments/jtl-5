@@ -490,7 +490,8 @@ class PostFinanceCheckoutTransactionService
         $newTransaction->space_id = $this->spaceId;
         $newTransaction->state = TransactionState::PENDING;
         $newTransaction->created_at = date('Y-m-d H:i:s');
-
+        
+        Shop::Container()->getDB()->delete('postfinancecheckout_transactions', 'transaction_id', $transactionId);
         Shop::Container()->getDB()->insert('postfinancecheckout_transactions', $newTransaction);
     }
 
@@ -665,7 +666,7 @@ class PostFinanceCheckoutTransactionService
             $uniqueName = $uniqueName . '_' . rand(1, 99999);
         } elseif ($attributes) {
             foreach ($attributes as $attribute) {
-                if ($attribute->cTyp !== 'FREIFELD') {
+                if (strpos(strtolower($attribute->cTyp), 'freifeld') === false) {
                     continue;
                 }
                 

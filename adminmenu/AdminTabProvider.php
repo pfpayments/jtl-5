@@ -32,6 +32,7 @@ class AdminTabProvider
     const ACTION_DOWNLOAD_PACKAGING_SLIP = 'download_packaging_slip';
     const ACTION_REFUND = 'refund';
     const ACTION_ORDER_DETAILS = 'order_details';
+    const ACTION_SEARCH_ORDERS = 'search_orders';
 
     const FILE_DOWNLOAD_ALLOWED_STATES = [
         'FULFILL',
@@ -98,66 +99,38 @@ class AdminTabProvider
      */
     public function createOrdersTab(int $menuID): string
     {
-        $action = !empty($_REQUEST['action']) ? $_REQUEST['action'] : null;
-
-        if (!empty($action)) {
-
-            switch ($action) {
-
-                case self::ACTION_COMPLETE:
-                    $transactionId = $_REQUEST['transactionId'] ?: null;
-                    $this->completeTransaction($transactionId);
-                    exit;
-
-                case self::ACTION_CANCEL:
-                    $transactionId = $_REQUEST['transactionId'] ?: null;
-                    $this->cancelTransaction($transactionId);
-                    exit;
-
-                case self::ACTION_DOWNLOAD_INVOICE:
-                    $transactionId = $_REQUEST['transactionId'] ?: null;
-                    $this->downloadInvoice($transactionId);
-                    exit;
-
-                case self::ACTION_DOWNLOAD_PACKAGING_SLIP:
-                    $transactionId = $_REQUEST['transactionId'] ?: null;
-                    $this->downloadPackagingSlip($transactionId);
-                    exit;
-
-                case self::ACTION_REFUND:
-                    $transactionId = $_REQUEST['transactionId'] ?: null;
-                    $amount = $_REQUEST['amount'] ?: 0;
-                    $this->refundService->makeRefund($transactionId, floatval($amount));
-
-
-                    $transaction = $this->transactionService->getTransactionFromPortal($transactionId);
-                    $transactionId = $transaction->getId();
-                    $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
-                    $orderId = (int)$localTransaction->order_id;
-                    $order = new Bestellung($orderId);
-
-                    $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                    $moduleId = $paymentMethodEntity->cModulId ?? '';
-                    $paymentMethod = new Method($moduleId);
-                    $paymentMethod->setOrderStatusToPaid($order);
-                    $incomingPayment = new stdClass();
-                    $incomingPayment->fBetrag = -1 * floatval($amount);
-                    $incomingPayment->cISO = $transaction->getCurrency();
-                    $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
-                    $paymentMethod->addIncomingPayment($order, $incomingPayment);
-                    exit;
-
-                case self::ACTION_ORDER_DETAILS:
-                    $this->displayOrderInfo($_REQUEST, $menuID);
-                    break;
-            }
+        $action = $_REQUEST['action'] ?? null;
+        
+        if ($action) {
+            $this->handleAction($action);
+            exit;
         }
-
-        $orders = [];
+        
+        $searchQueryString = $_GET['q'] ?? '';
+        $sqlConditions = [];
+        $params = [];
+        
+        if ($searchQueryString) {
+            $searchQuery = '%' . $searchQueryString . '%';
+            $sqlConditions[] = 'ord.cBestellNr LIKE :searchQuery';
+            $sqlConditions[] = 'tkunde.cVorname LIKE :searchQuery';
+            $sqlConditions[] = 'ord.cZahlungsartName LIKE :searchQuery';
+            $params[':searchQuery'] = $searchQuery;
+        }
+        
+        $sqlConditionStr = $sqlConditions ? 'WHERE ' . implode(' OR ', $sqlConditions) : '';
         $ordersQuantity = $this->db->query('SELECT transaction_id FROM postfinancecheckout_transactions', ReturnType::AFFECTED_ROWS);
         $pagination = (new Pagination('postfinancecheckout-orders'))->setItemCount($ordersQuantity)->assemble();
-
-        $orderArr = $this->db->query('SELECT ord.kBestellung, ord.fGesamtsumme, plugin.transaction_id, plugin.state FROM tbestellung ord JOIN postfinancecheckout_transactions plugin WHERE ord.kBestellung = plugin.order_id ORDER BY ord.kBestellung DESC LIMIT ' . $pagination->getLimitSQL(), ReturnType::ARRAY_OF_OBJECTS);
+        $query = '
+            SELECT ord.kBestellung, ord.fGesamtsumme, plugin.transaction_id, plugin.state
+            FROM tbestellung ord
+            JOIN postfinancecheckout_transactions plugin ON ord.kBestellung = plugin.order_id
+            JOIN tkunde ON tkunde.kKunde = ord.kKunde
+            ' . $sqlConditionStr . '
+            ORDER BY ord.kBestellung DESC
+        ';
+        
+        $orderArr = $this->db->executeQueryPrepared($query, $params, ReturnType::ARRAY_OF_OBJECTS);
         foreach ($orderArr as $order) {
             $orderId = (int)$order->kBestellung;
             $ordObj = new Bestellung($orderId);
@@ -179,16 +152,104 @@ class AdminTabProvider
             'jtl_postfinancecheckout_order_status',
             'jtl_postfinancecheckout_amount',
             'jtl_postfinancecheckout_there_are_no_orders',
+            'jtl_postfinancecheckout_search',
         ]);
-
+        
+        $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off' || $_SERVER['SERVER_PORT'] == 443) ? "https://" : "http://";
+        $currentUrl = $protocol . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI'];
+        
         return $this->smarty->assign('orders', $orders)
+            ->assign('currentUrl', $currentUrl)
+            ->assign('searchQueryString', $searchQueryString)
+            ->assign('adminUrl', $this->plugin->getPaths()->getadminURL())
             ->assign('translations', $translations)
             ->assign('pagination', $pagination)
             ->assign('pluginId', $this->plugin->getID())
             ->assign('postUrl', Shop::getURL() . '/' . \PFAD_ADMIN . 'plugin.php?kPlugin=' . $this->plugin->getID())
             ->assign('paymentStatus', $paymentStatus)
             ->assign('hash', 'plugin-tab-' . $menuID)
+            ->assign('tplPath', $this->plugin->getPaths()->getAdminPath() . 'templates')
             ->fetch($this->plugin->getPaths()->getAdminPath() . 'templates/postfinancecheckout_orders.tpl');
+    }
+    
+    /**
+     * @param string $action
+     * @return void
+     */
+    private function handleAction(string $action): void
+    {
+        $transactionId = $_REQUEST['transactionId'] ?? null;
+        switch ($action) {
+            case self::ACTION_COMPLETE:
+                if (!$transactionId) {
+                    Shop::Container()->getLogService()->error('No transaction ID provided on action ' . $action);
+                    exit;
+                }
+                $this->completeTransaction($transactionId);
+                break;
+            
+            case self::ACTION_CANCEL:
+                if (!$transactionId) {
+                    Shop::Container()->getLogService()->error('No transaction ID provided on action ' . $action);
+                    exit;
+                }
+                $this->cancelTransaction($transactionId);
+                break;
+            
+            case self::ACTION_DOWNLOAD_INVOICE:
+                if (!$transactionId) {
+                    Shop::Container()->getLogService()->error('No transaction ID provided on action ' . $action);
+                    exit;
+                }
+                $this->downloadInvoice($transactionId);
+                break;
+            
+            case self::ACTION_DOWNLOAD_PACKAGING_SLIP:
+                if (!$transactionId) {
+                    Shop::Container()->getLogService()->error('No transaction ID provided on action ' . $action);
+                    exit;
+                }
+                $this->downloadPackagingSlip($transactionId);
+                break;
+            
+            case self::ACTION_REFUND:
+                if (!$transactionId) {
+                    Shop::Container()->getLogService()->error('No transaction ID provided on action ' . $action);
+                    exit;
+                }
+                
+                $amount = (float) $_REQUEST['amount'] ?? 0;
+                $this->processRefund($transactionId, $amount);
+                break;
+            
+            case self::ACTION_ORDER_DETAILS:
+                $menuID = isset($_REQUEST['menuID']) ? (int) $_REQUEST['menuID'] : 0;
+                $this->displayOrderInfo($_REQUEST, $menuID);
+                break;
+        }
+    }
+    
+    /**
+     * @param string|null $transactionId
+     * @param float $amount
+     * @return void
+     */
+    private function processRefund(?string $transactionId, float $amount): void
+    {
+        $this->refundService->makeRefund($transactionId, $amount);
+        $transaction = $this->transactionService->getTransactionFromPortal($transactionId);
+        $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transaction->getId());
+        $order = new Bestellung((int) $localTransaction->order_id);
+        
+        $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+        $paymentMethod = new Method($paymentMethodEntity->cModulId);
+        $paymentMethod->setOrderStatusToPaid($order);
+        
+        $incomingPayment = new stdClass();
+        $incomingPayment->fBetrag = -1 * $amount;
+        $incomingPayment->cISO = $transaction->getCurrency();
+        $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
+        $paymentMethod->addIncomingPayment($order, $incomingPayment);
     }
 
     private function displayOrderInfo(array $post, int $menuID): string
@@ -213,7 +274,12 @@ class AdminTabProvider
             'jtl_postfinancecheckout_no_refunds_info_text',
         ]);
 
-        $transaction = $this->transactionService->getTransactionFromPortal($post['transaction_id']);
+        $transactonId = $post['transaction_id'] ?? null;
+        if ($transactonId === null) {
+            return '';
+        }
+        
+        $transaction = $this->transactionService->getTransactionFromPortal($transactonId);
         $currency = $transaction->getCurrency();
 
         $refunds = $this->refundService->getRefunds($post['order_id'], $transaction->getCurrency());

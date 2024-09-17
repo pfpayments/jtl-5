@@ -1,5 +1,25 @@
 <input type="hidden" name="form-url" id="form-url" value="{$postUrl}">
 {if $orders|@count > 0 && $orders}
+
+    <form method="get" name="postfinancecheckout-orders" action="{$currentUrl}">
+        <div class="form-row">
+            <!-- Label for the search input -->
+            <label class="col-sm-auto col-form-label" for="orderSearch">{$translations.jtl_postfinancecheckout_search}:</label>
+
+            <!-- Search input field -->
+            <div class="col-sm-auto mb-2">
+                <input class="form-control" name="q" type="text" id="orderSearch" placeholder="Search by order number" value="{$searchQueryString}">
+            </div>
+
+            <!-- Submit button -->
+            <span class="col-sm-auto">
+            <button name="submitSearch" type="submit" class="btn btn-primary btn-block">
+                <i class="fal fa-search"></i> Search
+            </button>
+        </span>
+        </div>
+    </form>
+
     {include file='tpl_inc/pagination.tpl' pagination=$pagination cParam_arr=['kPlugin'=>$pluginId] cAnchor=$hash}
     <form method="post" name="postfinancecheckout-orders" action="{$postUrl}">
         {$jtl_token}
@@ -15,52 +35,12 @@
                     <th></th>
                 </tr>
                 </thead>
-                <tbody>
-                {foreach $orders as $order}
-                    <tr>
-                        <td class="text-left">
-                            <div>{$order['orderDetails']->cBestellNr}</div>
-                            <small class="text-muted"><i class="far fa-calendar-alt"
-                                                         aria-hidden="true"></i> {$order['orderDetails']->dErstellt}</small>
-                        </td>
-                        <td>
-                            <div>
-                                {if isset($order['orderDetails']->oKunde->cVorname) || isset($order['orderDetails']->oKunde->cNachname) || isset($order['orderDetails']->oKunde->cFirma)}
-                                    {$order['orderDetails']->oKunde->cVorname} {$order['orderDetails']->oKunde->cNachname}
-                                    {if isset($order['orderDetails']->oKunde->cFirma) && $order['orderDetails']->oKunde->cFirma|strlen > 0}
-                                        ({$order['orderDetails']->oKunde->cFirma})
-                                    {/if}
-                                {else}
-                                    {__('noAccount')}
-                                {/if}
-                            </div>
-                            <small class="text-muted">
-                                <i class="fa fa-user" aria-hidden="true"></i>
-                                {$order['orderDetails']->oKunde->cMail}
-                            </small>
-                        </td>
-                        <td class="text-left">{$order['orderDetails']->cZahlungsartName}</td>
-                        <td class="text-left">
-                            {$paymentStatus[$order['orderDetails']->cStatus]}
-                        </td>
-                        <td class="text-left">
-                            {$order['orderDetails']->WarensummeLocalized[0]}
-                        </td>
-                        <td onclick="showDetails({
-                            'total_amount':'{$order['total_amount']}',
-                            'order_id':'{$order['orderDetails']->kBestellung}',
-                            'order_no':'{$order['orderDetails']->cBestellNr}',
-                            'transaction_id': '{$order['postfinancecheckout_transaction_id']}',
-                            'transaction_state': '{$order['postfinancecheckout_state']}',
-                            'action': 'order_details'
-                            })">
-                            <a href="#order-datails">
-                                <i class="fa fa-eye"></i>
-                            </a>
-                        </td>
-                    </tr>
-                {/foreach}
-                </tbody>
+
+                <div class="postfinancecheckout-loader text-center" style="display: none">
+                    <img src="{$adminUrl}/assets/spinner.gif"/>
+                </div>
+                <!-- Include the orders loop partial -->
+                {include file="`$tplPath`/_orders_table.tpl" orders=$orders}
             </table>
         </div>
     </form>
@@ -74,12 +54,12 @@
 
 
 <script>
-    function showDetails(requestParams) {
+    var requestUrl = $('#form-url').val();
 
-        var requestUrl = jQuery('input[id=form-url]').val();
+    function showDetails(requestParams) {
         $.ajax({
             url: requestUrl,
-            type: 'post',
+            type: 'POST',
             dataType: 'html',
             data: requestParams,
             global: false,
