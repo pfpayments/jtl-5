@@ -170,7 +170,7 @@ class PostFinanceCheckoutTransactionService
             $order->transaction_id = $transactionId;
             $order->data = json_encode([]);
             $order->payment_method = $_SESSION['possiblePaymentMethodName'];
-            $order->order_id = null;
+            $order->order_id = $orderNr;
             $order->space_id = $this->spaceId;
             $order->state = TransactionState::PENDING;
             $order->created_at = date('Y-m-d H:i:s');

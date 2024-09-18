@@ -130,7 +130,7 @@ class AdminTabProvider
             ORDER BY ord.kBestellung DESC
         ';
         
-        $orderArr = $this->db->executeQueryPrepared($query, $params, ReturnType::ARRAY_OF_OBJECTS);
+        $orderArr = $this->db->executeQueryPrepared($query . ' LIMIT ' . $pagination->getLimitSQL(), $params, ReturnType::ARRAY_OF_OBJECTS);
         foreach ($orderArr as $order) {
             $orderId = (int)$order->kBestellung;
             $ordObj = new Bestellung($orderId);
