@@ -4,45 +4,39 @@ namespace Plugin\jtl_postfinancecheckout\Services;
 
 use JTL\Alert\Alert;
 use JTL\Cart\CartItem;
-use JTL\Checkout\Nummern;
-use JTL\Catalog\Product\Preise;
 use JTL\Checkout\Bestellung;
 use JTL\Checkout\OrderHandler;
 use JTL\Checkout\Zahlungsart;
-use JTL\Helpers\PaymentMethod;
 use JTL\Helpers\Tax;
-use JTL\Mail\Mailer;
 use JTL\Mail\Mail\Mail;
+use JTL\Mail\Mailer;
 use JTL\Plugin\Payment\Method;
-use JTL\Plugin\Plugin;
 use JTL\Session\Frontend;
 use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
-use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutMailService;
+use stdClass;
 use PostFinanceCheckout\Sdk\ApiClient;
-use PostFinanceCheckout\Sdk\Model\{
-    AddressCreate,
-    Gender,
-    LineItemCreate,
-    LineItemType,
-    TaxCreate,
-    Transaction,
-    TransactionCreate,
-    TransactionInvoice,
-    TransactionPending,
-    TransactionState,
-    CreationEntityState,
-    CriteriaOperator,
-    EntityQuery,
-    EntityQueryFilter,
-    EntityQueryFilterType,
-    RefundState,
-    TransactionInvoiceState,
-    WebhookListener,
-    WebhookListenerCreate,
-    WebhookUrl,
-    WebhookUrlCreate,
-};
+use PostFinanceCheckout\Sdk\Model\{AddressCreate,
+  CreationEntityState,
+  CriteriaOperator,
+  EntityQuery,
+  EntityQueryFilter,
+  EntityQueryFilterType,
+  Gender,
+  LineItemCreate,
+  LineItemType,
+  RefundState,
+  TaxCreate,
+  Transaction,
+  TransactionCreate,
+  TransactionInvoice,
+  TransactionInvoiceState,
+  TransactionPending,
+  TransactionState,
+  WebhookListener,
+  WebhookListenerCreate,
+  WebhookUrl,
+  WebhookUrlCreate,};
 
 class PostFinanceCheckoutTransactionService
 {
@@ -206,7 +200,8 @@ class PostFinanceCheckoutTransactionService
         $pendingTransaction->setSuccessUrl($successUrl . '?tID=' . $transactionId);
         $pendingTransaction->setFailedUrl($failedUrl . '?tID=' . $transactionId);
 
-
+        
+        
         $this->apiClient->getTransactionService()
             ->confirm($this->spaceId, $pendingTransaction);
         
@@ -503,40 +498,38 @@ class PostFinanceCheckoutTransactionService
      */
     public function addIncommingPayment(string $transactionId, Bestellung $order, Transaction $transaction): void
     {
-        $localTransaction = $this->getLocalPostFinanceCheckoutTransactionById($transactionId);
-        if ($localTransaction->state !== TransactionState::FULFILL) {
-            $orderId = (int)$order->kBestellung;
+        $orderId = (int)$order->kBestellung;
+        if ($orderId === 0) {
+            return;
+        }
+        $this->updateTransactionStatus($transactionId, TransactionState::FULFILL);
 
-            if ($orderId === 0) {
+        $portalTransaction = $this->getTransactionFromPortal($transactionId);
+        if ($portalTransaction->getState() === TransactionState::FULFILL) {
+            // tzahlungseingang - table name of incomming payments
+            // kBestellung - table field which represents order ID
+            $incomingPaymentCheck = Shop::Container()->getDB()->selectSingleRow('tzahlungseingang', 'kBestellung', $orderId);
+            // We check if there's record for incomming payment for current order
+            if (!empty($incomingPaymentCheck->kZahlungseingang)) {
                 return;
             }
-            $this->updateTransactionStatus($transactionId, TransactionState::FULFILL);
 
-            $portalTransaction = $this->getTransactionFromPortal($transactionId);
-            if ($portalTransaction->getState() === TransactionState::FULFILL) {
-                // tzahlungseingang - table name of incomming payments
-                // kBestellung - table field which represents order ID
-                $incommingPayment = Shop::Container()->getDB()->selectSingleRow('tzahlungseingang', 'kBestellung', $orderId);
-                // We check if there's record for incomming payment for current order
-                if (!empty($incommingPayment->kZahlungseingang)) {
-                    return;
-                }
-
-                $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                $moduleId = $paymentMethodEntity->cModulId ?? '';
-                $paymentMethod = new Method($moduleId);
-                $paymentMethod->setOrderStatusToPaid($order);
-                $incomingPayment = new \stdClass();
-                $incomingPayment->fBetrag = $transaction->getAuthorizationAmount();
-                $incomingPayment->cISO = $transaction->getCurrency();
-                $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
-                $incomingPayment->cHinweis = $transactionId;
-                $paymentMethod->addIncomingPayment($order, $incomingPayment);
-                
-                // At this stage, the transaction goes directly to fulfill, so it's also authorized.
-                // Even when the sendEmail is invoked here, the email will be or not sent according to several conditions.
-                $this->sendEmail($orderId, 'fulfill');
-            }
+            $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+            $moduleId = $paymentMethodEntity->cModulId ?? '';
+            $paymentMethod = new Method($moduleId);
+            $paymentMethod->setOrderStatusToPaid($order);
+            $incomingPayment = new \stdClass();
+            $incomingPayment->fBetrag = $transaction->getAuthorizationAmount();
+            $incomingPayment->cISO = $transaction->getCurrency();
+            $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
+            $incomingPayment->cHinweis = $transactionId;
+            $paymentMethod->addIncomingPayment($order, $incomingPayment);
+            
+            // At this stage, the transaction goes directly to fulfill, so it's also authorized.
+            // Even when the sendEmail is invoked here, the email will be or not sent according to several conditions.
+            $this->sendEmail($orderId, 'fulfill');
+        } else {
+            Shop::Container()->getLogService()->error('addIncommingPayment payment was not created, because transaction was not in FULFILL status. TransactionId: ' . $transactionId);
         }
     }
 
@@ -549,7 +542,6 @@ class PostFinanceCheckoutTransactionService
         $_SESSION['finalize'] = true;
 
         $transaction = $this->getTransactionFromPortal($transactionId);
-
         $orderNr = $transaction->getMetaData()['order_nr'];
         $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
         
@@ -557,26 +549,19 @@ class PostFinanceCheckoutTransactionService
             // We check if order exist with such order nr. If yes, we select it's data, if not - we create it.
             // This check prevents only in these cases when webhook is triggered more than once or user refresh the page, or
             // got lost internet connection. It's more like catching edge case
-            $data = Shop::Container()->getDB()->select(
-              'tbestellung',
-              'cBestellNr',
-              $orderNr,
-              null,
-              null,
-              null,
-              null,
-              false,
-              'kBestellung'
-            );
-            if ($data !== null && isset($data->kBestellung)) {
-                $order = new Bestellung((int)$data->kBestellung);
-            } else {
+            $data = $this->getOrderIfExists($orderNr);
+            if ($data === null) {
+                // Order wasn't created before, so we insert new record
                 $order = $orderHandler->finalizeOrder($orderNr, false);
+            } else {
+                // We select order from database and creating backup with all session data
+                $order = new Bestellung((int)$data->kBestellung);
             }
         } else {
             // Updates order number for next order. Increase by 1 if is needed
             $lastOrderNo = $transaction->getMetaData()['order_no'];
             PostFinanceCheckoutHelper::createOrderNo(true, $lastOrderNo);
+            // Always inserting new order
             $order = $orderHandler->finalizeOrder($orderNr, false);
         }
         $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED, (int)$order->kBestellung);
@@ -588,6 +573,24 @@ class PostFinanceCheckoutTransactionService
         }
 
         return (int)$order->kBestellung;
+    }
+    
+    /**
+     * @param string $orderNr
+     * @return void
+     */
+    public function getOrderIfExists(string $orderNr): ?stdClass
+    {
+        $db = Shop::Container()->getDB();
+        
+        // Prepare and execute the query directly
+        $query = "SELECT kBestellung FROM tbestellung WHERE cBestellNr = :orderNr ORDER BY dErstellt DESC LIMIT 1";
+        $params = ['orderNr' => $orderNr];
+        
+        $data = $db->executeQueryPrepared($query, $params, 1); // The '1' here signifies to fetch one row only
+        
+        // Check if data is retrieved, otherwise return null
+        return $data ?: null;
     }
 
     /**
@@ -848,7 +851,7 @@ class PostFinanceCheckoutTransactionService
         $config = PostFinanceCheckoutHelper::getConfigByID($this->plugin->getId());
         $preventFromDuplicatedOrders = $config[PostFinanceCheckoutHelper::PREVENT_FROM_DUPLICATED_ORDERS] ?? null;
 
-        return $preventFromDuplicatedOrders === 'YES';
+        return strtolower($preventFromDuplicatedOrders) === 'yes';
     }
 
     /**

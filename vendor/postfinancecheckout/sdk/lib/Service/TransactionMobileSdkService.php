@@ -31,7 +31,7 @@ use PostFinanceCheckout\Sdk\ObjectSerializer;
  *
  * @category Class
  * @package  PostFinanceCheckout\Sdk
- * @author   customweb GmbH
+ * @author   wallee AG
  * @license  http://www.apache.org/licenses/LICENSE-2.0 Apache License v2
  */
 class TransactionMobileSdkService {
@@ -100,7 +100,7 @@ class TransactionMobileSdkService {
 		}
 		// header params
 		$headerParams = [];
-		$headerAccept = $this->apiClient->selectHeaderAccept(['application/json', 'text/plain;charset=utf-8']);
+		$headerAccept = $this->apiClient->selectHeaderAccept(['text/plain;charset=utf-8', 'application/json']);
 		if (!is_null($headerAccept)) {
 			$headerParams[HttpRequest::HEADER_KEY_ACCEPT] = $headerAccept;
 		}
@@ -177,5 +177,6 @@ class TransactionMobileSdkService {
 			throw $e;
 		}
 	}
+
 
 }

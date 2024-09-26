@@ -29,7 +29,7 @@ use \PostFinanceCheckout\Sdk\ObjectSerializer;
  * @category    Class
  * @description The schema of a single table in Analytics.
  * @package     PostFinanceCheckout\Sdk
- * @author      customweb GmbH
+ * @author      wallee AG
  * @license     http://www.apache.org/licenses/LICENSE-2.0 Apache License v2
  */
 class AnalyticsSchemaTable implements ModelInterface, ArrayAccess
@@ -227,7 +227,7 @@ class AnalyticsSchemaTable implements ModelInterface, ArrayAccess
     /**
      * Sets columns
      *
-     * @param \PostFinanceCheckout\Sdk\Model\AnalyticsSchemaColumn[] $columns The schemas of all columns of this table.
+     * @param \PostFinanceCheckout\Sdk\Model\AnalyticsSchemaColumn[] $columns The schemas of all columns of the table.
      *
      * @return $this
      */
@@ -252,7 +252,7 @@ class AnalyticsSchemaTable implements ModelInterface, ArrayAccess
     /**
      * Sets description
      *
-     * @param map[string,string] $description A human readable description of the entity type contained in this table.
+     * @param map[string,string] $description The localized description of the table.
      *
      * @return $this
      */
@@ -277,7 +277,7 @@ class AnalyticsSchemaTable implements ModelInterface, ArrayAccess
     /**
      * Sets table_name
      *
-     * @param string $table_name The name of this table.
+     * @param string $table_name The name of the table.
      *
      * @return $this
      */

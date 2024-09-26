@@ -31,7 +31,7 @@ use PostFinanceCheckout\Sdk\ObjectSerializer;
  *
  * @category Class
  * @package  PostFinanceCheckout\Sdk
- * @author   customweb GmbH
+ * @author   wallee AG
  * @license  http://www.apache.org/licenses/LICENSE-2.0 Apache License v2
  */
 class TransactionService {
@@ -673,7 +673,7 @@ class TransactionService {
 		}
 		// header params
 		$headerParams = [];
-		$headerAccept = $this->apiClient->selectHeaderAccept(['application/json;charset=utf-8', 'text/csv']);
+		$headerAccept = $this->apiClient->selectHeaderAccept(['text/csv', 'application/json;charset=utf-8']);
 		if (!is_null($headerAccept)) {
 			$headerParams[HttpRequest::HEADER_KEY_ACCEPT] = $headerAccept;
 		}
@@ -2106,5 +2106,6 @@ class TransactionService {
 			throw $e;
 		}
 	}
+
 
 }

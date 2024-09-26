@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5c6e29df5d4645dfc552b47939912c92",
+    "content-hash": "9e70f988951fc75b1454d83788dc5d46",
     "packages": [
         {
             "name": "postfinancecheckout/sdk",
-            "version": "3.2.0",
+            "version": "4.6.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/pfpayments/php-sdk.git",
-                "reference": "278ee4dbb9765a7946e58bf89dc8125b8dd8113b"
+                "reference": "6c5a5008a8142de8e8f757af4b28c16b25ca6555"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pfpayments/php-sdk/zipball/278ee4dbb9765a7946e58bf89dc8125b8dd8113b",
-                "reference": "278ee4dbb9765a7946e58bf89dc8125b8dd8113b",
+                "url": "https://api.github.com/repos/pfpayments/php-sdk/zipball/6c5a5008a8142de8e8f757af4b28c16b25ca6555",
+                "reference": "6c5a5008a8142de8e8f757af4b28c16b25ca6555",
                 "shasum": ""
             },
             "require": {
@@ -45,7 +45,8 @@
             "authors": [
                 {
                     "name": "wallee AG",
-                    "homepage": "https://wallee.com"
+                    "email": "checkout@postfinance.ch",
+                    "homepage": "https://postfinance.ch/en/business/products/e-commerce/postfinance-checkout-all-in-one.html"
                 }
             ],
             "description": "PostFinance Checkout SDK for PHP",
@@ -58,9 +59,9 @@
                 "sdk"
             ],
             "support": {
-                "source": "https://github.com/pfpayments/php-sdk/tree/3.2.0"
+                "source": "https://github.com/pfpayments/php-sdk/tree/4.6.0"
             },
-            "time": "2023-02-24T14:12:09+00:00"
+            "time": "2024-09-04T09:20:56+00:00"
         }
     ],
     "packages-dev": [],

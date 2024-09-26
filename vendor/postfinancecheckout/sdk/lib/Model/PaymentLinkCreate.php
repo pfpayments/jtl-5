@@ -27,7 +27,7 @@ use \PostFinanceCheckout\Sdk\ObjectSerializer;
  * @category    Class
  * @description The payment link defines an URL to automatically create transactions.
  * @package     PostFinanceCheckout\Sdk
- * @author      customweb GmbH
+ * @author      wallee AG
  * @license     http://www.apache.org/licenses/LICENSE-2.0 Apache License v2
  */
 class PaymentLinkCreate extends AbstractPaymentLinkUpdate 
@@ -134,6 +134,9 @@ class PaymentLinkCreate extends AbstractPaymentLinkUpdate
 
         if ($this->container['external_id'] === null) {
             $invalidProperties[] = "'external_id' can't be null";
+        }
+        if ($this->container['protection_mode'] === null) {
+            $invalidProperties[] = "'protection_mode' can't be null";
         }
         return $invalidProperties;
     }

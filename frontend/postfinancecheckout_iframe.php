@@ -12,7 +12,14 @@ $translations = PostFinanceCheckoutHelper::getTranslations($plugin->getLocalizat
 ], false);
 
 $isTwint = false;
-if (strpos(strtolower($_SESSION['Zahlungsart']->cName), "twint") !== false || strpos(strtolower($_SESSION['Zahlungsart']->cTSCode), "twint") !== false) {
+$paymentMethod = $_SESSION['Zahlungsart'] ?? null;
+if ($paymentMethod === null) {
+    $linkHelper = Shop::Container()->getLinkService();
+    \header('Location: ' . $linkHelper->getStaticRoute('bestellvorgang.php') . '?editZahlungsart=1');
+    exit;
+}
+
+if (strpos(strtolower($paymentMethod->cName), "twint") !== false || strpos(strtolower($paymentMethod->cTSCode), "twint") !== false) {
     $isTwint = true;
 }
 

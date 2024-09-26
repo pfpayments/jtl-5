@@ -29,7 +29,7 @@ use \PostFinanceCheckout\Sdk\ObjectSerializer;
  * @category    Class
  * @description 
  * @package     PostFinanceCheckout\Sdk
- * @author      customweb GmbH
+ * @author      wallee AG
  * @license     http://www.apache.org/licenses/LICENSE-2.0 Apache License v2
  */
 class UserSpaceRole implements ModelInterface, ArrayAccess
@@ -266,7 +266,7 @@ class UserSpaceRole implements ModelInterface, ArrayAccess
     /**
      * Sets role
      *
-     * @param int $role 
+     * @param int $role The role that is assigned to the user.
      *
      * @return $this
      */
@@ -291,7 +291,7 @@ class UserSpaceRole implements ModelInterface, ArrayAccess
     /**
      * Sets space
      *
-     * @param int $space 
+     * @param int $space The space in which the role is assigned to the user.
      *
      * @return $this
      */
@@ -316,7 +316,7 @@ class UserSpaceRole implements ModelInterface, ArrayAccess
     /**
      * Sets user
      *
-     * @param int $user 
+     * @param int $user The user whose role this defines.
      *
      * @return $this
      */

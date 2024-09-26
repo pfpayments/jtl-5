@@ -18,7 +18,9 @@ if ($transactionId) {
     $transaction = $transactionService->getTransactionFromPortal($transactionId);
     $createAfterPayment = (int)$transaction->getMetaData()['orderAfterPayment'] ?? 1;
     if ($createAfterPayment) {
-        if (empty($orderId)) {
+        $orderNr = $transaction->getMetaData()['order_nr'];
+        $data = $transactionService->getOrderIfExists($orderNr);
+        if ($data === null) {
             $orderId = $transactionService->createOrderAfterPayment($transactionId);
         }
     }

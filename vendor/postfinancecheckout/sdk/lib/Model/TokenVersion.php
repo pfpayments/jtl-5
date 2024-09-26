@@ -29,7 +29,7 @@ use \PostFinanceCheckout\Sdk\ObjectSerializer;
  * @category    Class
  * @description 
  * @package     PostFinanceCheckout\Sdk
- * @author      customweb GmbH
+ * @author      wallee AG
  * @license     http://www.apache.org/licenses/LICENSE-2.0 Apache License v2
  */
 class TokenVersion implements ModelInterface, ArrayAccess
@@ -550,7 +550,7 @@ class TokenVersion implements ModelInterface, ArrayAccess
     /**
      * Sets labels
      *
-     * @param \PostFinanceCheckout\Sdk\Model\Label[] $labels 
+     * @param \PostFinanceCheckout\Sdk\Model\Label[] $labels The labels providing additional information about the object.
      *
      * @return $this
      */

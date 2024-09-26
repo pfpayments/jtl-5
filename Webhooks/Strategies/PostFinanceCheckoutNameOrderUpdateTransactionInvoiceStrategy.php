@@ -2,6 +2,7 @@
 
 namespace Plugin\jtl_postfinancecheckout\Webhooks\Strategies;
 
+use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutOrderService;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\Webhooks\Strategies\Interfaces\PostFinanceCheckoutOrderUpdateStrategyInterface;
@@ -39,8 +40,9 @@ class PostFinanceCheckoutNameOrderUpdateTransactionInvoiceStrategy implements Po
             ->getTransaction();
 
         $transactionId = $transaction->getId();
-        $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
-        $orderId = (int)$localTransaction->order_id;
+        $orderNr = $transaction->getMetaData()['order_nr'];
+        $orderData = $this->transactionService->getOrderIfExists($orderNr);
+        $orderId = (int)$orderData->kBestellung;
 
         switch ($transactionInvoice->getState()) {
             case TransactionInvoiceState::DERECOGNIZED:

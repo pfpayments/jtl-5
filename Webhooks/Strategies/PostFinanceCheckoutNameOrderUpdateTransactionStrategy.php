@@ -4,19 +4,12 @@ namespace Plugin\jtl_postfinancecheckout\Webhooks\Strategies;
 
 use JTL\Checkout\Bestellung;
 use JTL\Checkout\Zahlungsart;
-use JTL\Customer\Customer;
-use JTL\Mail\Mail\Mail;
-use JTL\Mail\Mailer;
-use JTL\Plugin\Data\PaymentMethod;
 use JTL\Plugin\Payment\Method;
 use JTL\Plugin\Plugin;
-use JTL\Session\Frontend;
 use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutOrderService;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\Webhooks\Strategies\Interfaces\PostFinanceCheckoutOrderUpdateStrategyInterface;
-use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
-use stdClass;
 use PostFinanceCheckout\Sdk\Model\Transaction;
 use PostFinanceCheckout\Sdk\Model\TransactionState;
 
@@ -52,11 +45,12 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
     {
         $transaction = $this->transactionService->getTransactionFromPortal($entityId);
         $transactionId = $transaction->getId();
-
-        $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
-        $orderId = (int)$localTransaction->order_id;
+        
+        $orderNr = $transaction->getMetaData()['order_nr'];
+        $orderData = $this->transactionService->getOrderIfExists($orderNr);
+        $orderId = (int)$orderData->kBestellung;
         $transactionState = $transaction->getState();
-
+    
         switch ($transactionState) {
             case TransactionState::FULFILL:
                 $order = new Bestellung($orderId);
