@@ -145,24 +145,43 @@ class Bootstrap extends Bootstrapper
             $paymentMethods = $handler->getPaymentMethodsForForm($smarty);
             $smarty->assign('Zahlungsarten', $paymentMethods);
         });
-
+        
         $dispatcher->listen('shop.hook.' . \HOOK_BESTELLUNGEN_XML_BEARBEITESET, function ($args) use ($handler) {
-            $order = $args['oBestellung'] ?? [];
-            if ((int)$order->cStatus === \BESTELLUNG_STATUS_BEZAHLT) {
-                $order = new Bestellung($args['oBestellung']->kBestellung);
+            $order = $args['oBestellung'] ?? null;
+            if ($order === null) {
+                return;
+            }
+            
+            $orderStatus = $order->cStatus ?? null;
+            if ($orderStatus === null) {
+                return;
+            }
+            
+            if ((int)$orderStatus === \BESTELLUNG_STATUS_BEZAHLT) {
+                $orderId = $args['oBestellung']->kBestellung ?? null;
+                if ($orderId === null) {
+                    return;
+                }
 
-                $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                $moduleId = $paymentMethodEntity->cModulId ?? '';
-                $paymentMethod = new Method($moduleId);
-                $paymentMethod->setOrderStatusToPaid($order);
-
-                Shop::Container()
-                    ->getDB()->update(
+                $order = new Bestellung($orderId);
+                if (empty($order->kZahlungsart)) {
+                    return;
+                }
+                $paymentMethodEntity = new Zahlungsart($order->kZahlungsart);
+                
+                if ($order->cStatus != \BESTELLUNG_STATUS_VERSANDT && $paymentMethodEntity->cAnbieter === 'PostFinanceCheckout') {
+                    $moduleId = $paymentMethodEntity->cModulId ?? '';
+                    $paymentMethod = new Method($moduleId);
+                    $paymentMethod->setOrderStatusToPaid($order);
+                    
+                    Shop::Container()
+                      ->getDB()->update(
                         'tbestellung',
                         ['kBestellung',],
-                        [$args['oBestellung']->kBestellung],
+                        [$orderId],
                         (object)['cAbgeholt' => 'Y']
                     );
+                }
             }
         });
 

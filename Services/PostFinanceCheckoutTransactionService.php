@@ -664,6 +664,10 @@ class PostFinanceCheckoutTransactionService
         $slug = trim($slug, '-');
         
         $uniqueName = $productData->cArtNr ?: $slug;
+        $uniqueProperty = $productData->cUnique ?? null;
+        if ($uniqueProperty !== null) {
+            $uniqueName .= '_' . $productData->cUnique;
+        }
         $attributes = $productData->WarenkorbPosEigenschaftArr ?? [];
         if ($isDiscount || $productData->nPosTyp === \C_WARENKORBPOS_TYP_GUTSCHEIN) {
             $uniqueName = $uniqueName . '_' . rand(1, 99999);

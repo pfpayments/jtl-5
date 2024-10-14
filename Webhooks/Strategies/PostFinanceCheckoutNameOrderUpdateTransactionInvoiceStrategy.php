@@ -38,11 +38,23 @@ class PostFinanceCheckoutNameOrderUpdateTransactionInvoiceStrategy implements Po
         $transaction = $transactionInvoice->getCompletion()
             ->getLineItemVersion()
             ->getTransaction();
-
-        $transactionId = $transaction->getId();
+        
+        
         $orderNr = $transaction->getMetaData()['order_nr'];
-        $orderData = $this->transactionService->getOrderIfExists($orderNr);
-        $orderId = (int)$orderData->kBestellung;
+        $transactionId = $transaction->getId();
+        
+        // Fallback for older plugin versions
+        if ($orderNr === null) {
+            $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
+            $orderId = (int)$localTransaction->order_id;
+        } else {
+            $orderData = $this->transactionService->getOrderIfExists($orderNr);
+            if ($orderData === null) {
+                Shop::Container()->getLogService()->error('Order was not found by nr: ' . $orderNr);
+                return;
+            }
+            $orderId = (int)$orderData->kBestellung;
+        }
 
         switch ($transactionInvoice->getState()) {
             case TransactionInvoiceState::DERECOGNIZED:
