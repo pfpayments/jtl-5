@@ -50,7 +50,6 @@ class PostFinanceCheckoutNameOrderUpdateTransactionInvoiceStrategy implements Po
         } else {
             $orderData = $this->transactionService->getOrderIfExists($orderNr);
             if ($orderData === null) {
-                Shop::Container()->getLogService()->error('Order was not found by nr: ' . $orderNr);
                 return;
             }
             $orderId = (int)$orderData->kBestellung;

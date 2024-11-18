@@ -53,7 +53,6 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
         } else {
             $orderData = $this->transactionService->getOrderIfExists($orderNr);
             if ($orderData === null) {
-                Shop::Container()->getLogService()->error('Order was not found by nr: ' . $orderNr);
                 return;
             }
             $orderId = (int)$orderData->kBestellung;
@@ -69,7 +68,6 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
 
             case TransactionState::PROCESSING:
                 $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
-                print 'Order ' . $orderId . ' status was updated to processing. Triggered by Transaction Invoice webhook.';
                 break;
 
             case TransactionState::AUTHORIZED:

@@ -100,7 +100,7 @@ class AdminTabProvider
     public function createOrdersTab(int $menuID): string
     {
         $action = $_REQUEST['action'] ?? null;
-        
+        $orders = [];
         if ($action) {
             $this->handleAction($action);
             exit;
