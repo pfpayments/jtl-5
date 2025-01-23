@@ -1,6 +1,6 @@
 
 
-PostFinanceCheckout Payment for JTL 5.2
+PostFinanceCheckout Payment for JTL 5.2 and 5.3
 =============================
 
 The PostFinanceCheckout Payment plugin wraps around the PostFinanceCheckout API. This library facilitates your interaction with various services such as transactions.
@@ -8,7 +8,7 @@ The PostFinanceCheckout Payment plugin wraps around the PostFinanceCheckout API.
 ## Requirements
 
 - PHP 8.1
-- JTL 5.2
+- JTL 5.2.x, 5.3.x
 
 ## Installation
 
@@ -36,7 +36,7 @@ account dashboard.
 
 ## Documentation
 
-[Documentation](https://plugin-documentation.postfinance-checkout.ch/pfpayments/jtl-5/1.0.34/docs/en/documentation.html)
+[Documentation](https://plugin-documentation.postfinance-checkout.ch/pfpayments/jtl-5/1.0.35-beta/docs/en/documentation.html)
 
 ## License
 

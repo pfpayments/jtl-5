@@ -2,12 +2,12 @@
 
 namespace Plugin\jtl_postfinancecheckout;
 
-use JTL\Plugin\Helper;
-use JTL\Shop;
-use JTL\Plugin\Data\Localization;
-use PostFinanceCheckout\Sdk\ApiClient;
-use JTL\Plugin\Helper as PluginHelper;
 use JTL\Checkout\Nummern;
+use JTL\Plugin\Data\Localization;
+use JTL\Plugin\Helper;
+use JTL\Plugin\Helper as PluginHelper;
+use JTL\Shop;
+use PostFinanceCheckout\Sdk\ApiClient;
 
 /**
  * Class PostFinanceCheckoutHelper
@@ -29,6 +29,9 @@ class PostFinanceCheckoutHelper extends Helper
     const SEND_FULFILL_EMAIL = 'jtl_postfinancecheckout_send_fulfill_email';
     const SEND_CONFIRMATION_EMAIL = 'jtl_postfinancecheckout_send_confirmation_email';
     const PREVENT_FROM_DUPLICATED_ORDERS = 'jtl_postfinancecheckout_prevent_from_duplicated_orders';
+    const INTEGRATION_TYPE = 'jtl_postfinancecheckout_integration_type';
+    const INTEGRATION_TYPE_PAYMENT_PAGE = 'payment_page';
+
 
     const PAYMENT_METHOD_CONFIGURATION = 'PaymentMethodConfiguration';
     const REFUND = 'Refund';
@@ -198,7 +201,7 @@ class PostFinanceCheckoutHelper extends Helper
             return null;
         }
     }
-    
+
     /**
      * @param $update
      * @param $lastOrderNo
@@ -223,7 +226,7 @@ class PostFinanceCheckoutHelper extends Helper
                 }
             }
         }
-        
+
         /*
         *   %Y = -aktuelles Jahr
         *   %m = -aktueller Monat
@@ -240,8 +243,18 @@ class PostFinanceCheckoutHelper extends Helper
           [\date('Y'), \date('m'), \date('d'), \date('W')],
           $conf['bestellabschluss_bestellnummer_suffix']
         );
-        
+
         return [$prefix . $orderNo . $suffix, $orderNo];
+    }
+
+    /**
+     * @param int $pluginId
+     * @return string
+     */
+    public static function getIntegrationType(int $pluginId): string
+    {
+        $config = self::getConfigByID($pluginId);
+        return $config[self::INTEGRATION_TYPE] ?? 'payment_page';
     }
 }
 

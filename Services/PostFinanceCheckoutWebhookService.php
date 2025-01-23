@@ -25,7 +25,7 @@ class PostFinanceCheckoutWebhookService
 	 * WebHook configs
 	 */
 	protected $webHookEntitiesConfig = [];
-	
+
 	/**
 	 * WebHook configs
 	 */
@@ -95,30 +95,30 @@ class PostFinanceCheckoutWebhookService
 		],
 		'notifyEveryChange' => true,
 	  ],
-	
+
 	];
-	
+
 	/**
 	 * @var ApiClient $apiClient
 	 */
 	protected ApiClient $apiClient;
-	
+
 	/**
 	 * @var $spaceId
 	 */
 	protected $spaceId;
-	
+
 	public function __construct($apiClient, $pluginId)
 	{
 		$this->apiClient = $apiClient;
-		
+
 		$config = PostFinanceCheckoutHelper::getConfigByID($pluginId);
 		$spaceId = $config[PostFinanceCheckoutHelper::SPACE_ID];
 		$this->spaceId = $spaceId;
-		
+
 		$this->setWebHookEntitiesConfig();
 	}
-	
+
 	/**
 	 * Set webhook configs
 	 */
@@ -133,7 +133,7 @@ class PostFinanceCheckoutWebhookService
 			];
 		}
 	}
-	
+
 	/**
 	 * Install WebHooks
 	 *
@@ -146,7 +146,7 @@ class PostFinanceCheckoutWebhookService
 	{
 		return $this->installListeners();
 	}
-	
+
 	/**
 	 * Install Listeners
 	 *
@@ -161,30 +161,31 @@ class PostFinanceCheckoutWebhookService
 			$webHookEntityIds = array_map(function (WebhookListener $webHook) {
 				return $webHook->getEntity();
 			}, $installedWebHooks);
-			
+
 			foreach ($this->webHookEntitiesConfig as $data) {
-				
+
 				if (in_array($data['id'], $webHookEntityIds)) {
 					continue;
 				}
-				
+
 				$entity = (new WebhookListenerCreate())
 				  ->setName($data['name'])
 				  ->setEntity($data['id'])
 				  ->setNotifyEveryChange($data['notifyEveryChange'])
 				  ->setState(CreationEntityState::CREATE)
 				  ->setEntityStates($data['states'])
-				  ->setUrl($webHookUrlId);
-				
+				  ->setUrl($webHookUrlId)
+				  ->setEnablePayloadSignatureAndState(true);
+
 				$returnValue[] = $this->apiClient->getWebhookListenerService()->create($this->spaceId, $entity);
 			}
 		} catch (\Exception $exception) {
 			return [];
 		}
-		
+
 		return $returnValue;
 	}
-	
+
 	/**
 	 * Create WebHook URL
 	 *
@@ -196,16 +197,16 @@ class PostFinanceCheckoutWebhookService
 	protected function getOrCreateWebHookUrl()
 	{
 		$webHookUrl = $this->getWebhookUrl();
-		
+
 		if (!empty($webHookUrl[0])) {
 			return $webHookUrl[0];
 		}
-		
+
 		$webHookUrl = $this->createWebhookUrl();
-		
+
 		return current($webHookUrl);
 	}
-	
+
 	protected function createWebhookUrl(): array
 	{
 		/** @noinspection PhpParamsInspection */
@@ -213,12 +214,12 @@ class PostFinanceCheckoutWebhookService
 		  ->setName('Jtl5::WebHookURL')
 		  ->setUrl($this->getWebHookCallBackUrl())
 		  ->setState(CreationEntityState::ACTIVE);
-		
+
 		$this->apiClient->getWebhookUrlService()->create($this->spaceId, $entity);
-		
+
 		return $this->getWebhookUrl();
 	}
-	
+
 	protected function getWebhookUrl(): array
 	{
 		/** @noinspection PhpParamsInspection */
@@ -228,12 +229,12 @@ class PostFinanceCheckoutWebhookService
 			$this->getEntityFilter('state', CreationEntityState::ACTIVE),
 			$this->getEntityFilter('url', $this->getWebHookCallBackUrl()),
 		  ]);
-		
+
 		$query = (new EntityQuery())->setFilter($entityQueryFilter)->setNumberOfEntities(1);
-		
+
 		return $this->apiClient->getWebhookUrlService()->search($this->spaceId, $query);
 	}
-	
+
 	/**
 	 * Creates and returns a new entity filter.
 	 *
@@ -252,7 +253,7 @@ class PostFinanceCheckoutWebhookService
 		  ->setFieldName($fieldName)
 		  ->setValue($value);
 	}
-	
+
 	/**
 	 * Get web hook callback url
 	 *
@@ -262,7 +263,7 @@ class PostFinanceCheckoutWebhookService
 	{
 		return Shop::getURL() . '/postfinancecheckout-webhook';
 	}
-	
+
 	/**
 	 * @param int $webHookUrlId
 	 *
@@ -280,9 +281,9 @@ class PostFinanceCheckoutWebhookService
 			$this->getEntityFilter('state', CreationEntityState::ACTIVE),
 			$this->getEntityFilter('url.id', $webHookUrlId),
 		  ]);
-		
+
 		$query = (new EntityQuery())->setFilter($entityQueryFilter);
-		
+
 		return $this->apiClient->getWebhookListenerService()->search($this->spaceId, $query);
 	}
 }

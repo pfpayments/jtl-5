@@ -9,7 +9,7 @@
     <Icon>logo.jpg</Icon>
     <PluginID>jtl_postfinancecheckout</PluginID>
     <CreateDate>2023-05-29</CreateDate>
-    <Version>1.0.34</Version>
+    <Version>1.0.35-beta</Version>
     <Install>
         <Locales>
             <Variable>
@@ -472,6 +472,15 @@
                     <SelectboxOptions>
                         <Option value="NO" sort="0">No</Option>
                         <Option value="YES" sort="1">Yes</Option>
+                    </SelectboxOptions>
+                </Setting>
+
+                <Setting type="selectbox" initialValue="payment_page" sort="9" conf="Y">
+                    <Name>Integration type</Name>
+                    <ValueName>jtl_postfinancecheckout_integration_type</ValueName>
+                    <SelectboxOptions>
+                        <Option value="payment_page" sort="0">Payment Page</Option>
+                        <Option value="iframe" sort="1">Iframe</Option>
                     </SelectboxOptions>
                 </Setting>
             </Settingslink>

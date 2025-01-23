@@ -2,14 +2,16 @@
 
 namespace Plugin\jtl_postfinancecheckout\Webhooks\Strategies;
 
+use JTL\Catalog\Product\Artikel;
+use JTL\Checkout\StockUpdater;
+use JTL\Helpers\Product;
+use JTL\Session\Frontend;
+use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutOrderService;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutRefundService;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\Webhooks\Strategies\Interfaces\PostFinanceCheckoutOrderUpdateStrategyInterface;
 use PostFinanceCheckout\Sdk\Model\TransactionState;
-use JTL\Catalog\Product\Artikel;
-use JTL\Checkout\StockUpdater;
-use JTL\Helpers\Product;
 
 class PostFinanceCheckoutNameOrderUpdateRefundStrategy implements PostFinanceCheckoutOrderUpdateStrategyInterface
 {
@@ -40,11 +42,7 @@ class PostFinanceCheckoutNameOrderUpdateRefundStrategy implements PostFinanceChe
         $this->refundService = $refundService;
         $this->transactionService = $transactionService;
         $this->orderService = new PostFinanceCheckoutOrderService();
-
-        if (!function_exists('getStockUpdater')) {
-            require_once \PFAD_ROOT . \PFAD_INCLUDES . 'bestellabschluss_inc.php';
-        }
-        $this->stockUpdater = getStockUpdater();
+        $this->stockUpdater = new StockUpdater(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
     }
 
     /**
@@ -71,7 +69,6 @@ class PostFinanceCheckoutNameOrderUpdateRefundStrategy implements PostFinanceChe
 
         // Restores the stock of the refunded product.
         $reductions = $refund->getReductions();
-        $quantity = 0;
         if (count($reductions) > 0) {
             foreach ($reductions as $reduction) {
                 $quantity = $reduction->getQuantityReduction();
@@ -89,8 +86,6 @@ class PostFinanceCheckoutNameOrderUpdateRefundStrategy implements PostFinanceChe
                         }
                     }
                 }
-
-                $quantity = 0;
             }
         }
 

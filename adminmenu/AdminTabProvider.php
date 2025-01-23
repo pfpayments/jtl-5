@@ -109,6 +109,7 @@ class AdminTabProvider
         $searchQueryString = $_GET['q'] ?? '';
         $sqlConditions = [];
         $params = [];
+        $orders = [];
         
         if ($searchQueryString) {
             $searchQuery = '%' . $searchQueryString . '%';

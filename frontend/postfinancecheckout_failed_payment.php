@@ -4,6 +4,7 @@ use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutApiClient;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
+use JTL\Alert\Alert;
 
 /** @global \JTL\Smarty\JTLSmarty $smarty */
 /** @global JTL\Plugin\PluginInterface $plugin */

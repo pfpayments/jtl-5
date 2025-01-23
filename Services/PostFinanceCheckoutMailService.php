@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace Plugin\jtl_postfinancecheckout\Services;
 
+use JTL\Cart\CartHelper;
+use JTL\Catalog\Product\Preise;
 use JTL\Checkout\Bestellung;
+use JTL\Checkout\OrderHandler;
 use JTL\Customer\Customer;
 use JTL\DB\DbInterface;
-use JTL\Mail\Mailer;
+use JTL\Helpers\Order;
 use JTL\Mail\Mail\Mail;
+use JTL\Mail\Mailer;
+use JTL\Session\Frontend;
+use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 
 /**
@@ -142,12 +148,22 @@ class PostFinanceCheckoutMailService {
      * @return stdClass The data prepared for the email.
      */
     protected function prepareData(int $orderId): \stdClass {
-        $order = new Bestellung($orderId, FALSE, $this->db);
-        $order->fuelleBestellung(false);
+        $order  = (new Bestellung($orderId, false, $this->db))->fuelleBestellung(false);
+        $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
+        $helper = new Order($order);
+        $amount = $helper->getTotal(4);
+
         $customer = new Customer($order->kKunde, null, $this->db);
         $data = new \stdClass();
+        $data->cVerfuegbarkeit_arr = $orderHandler->checkAvailability();
         $data->tkunde = $customer;
         $data->tbestellung = $order;
+        $data->payments       = $order->getIncommingPayments(false);
+        $data->totalLocalized = Preise::getLocalizedPriceWithoutFactor(
+            $amount->total[CartHelper::GROSS],
+            $amount->currency,
+            false
+        );
 
         return $data;
     }

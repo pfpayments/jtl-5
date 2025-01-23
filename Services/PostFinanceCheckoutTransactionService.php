@@ -149,7 +149,7 @@ class PostFinanceCheckoutTransactionService
             if ($this->isPreventFromDuplicatedOrders()) {
                 [$orderNr, $orderNumber] = PostFinanceCheckoutHelper::createOrderNo();
                 $transactionByOrderReference = $this->getTransactionByOrderReference($orderNr);
-                
+
                 if ($transactionByOrderReference) {
                     [$orderNr, $orderNumber] = PostFinanceCheckoutHelper::createOrderNo();
                     $pendingTransaction->setVersion($transaction->getVersion() + 1);
@@ -200,11 +200,17 @@ class PostFinanceCheckoutTransactionService
         $pendingTransaction->setSuccessUrl($successUrl . '?tID=' . $transactionId);
         $pendingTransaction->setFailedUrl($failedUrl . '?tID=' . $transactionId);
 
-        
-        
+        $integration = PostFinanceCheckoutHelper::getIntegrationType($this->plugin->getId());
+        if ($integration === PostFinanceCheckoutHelper::INTEGRATION_TYPE_PAYMENT_PAGE) {
+            $paymentMethodConfiguration = $this->getTransactionPaymentMethod($pendingTransaction->getId(), $this->spaceId);
+            if ($paymentMethodConfiguration) {
+                $pendingTransaction->setAllowedPaymentMethodConfigurations([$paymentMethodConfiguration->getId()]);
+            }
+        }
+
         $this->apiClient->getTransactionService()
             ->confirm($this->spaceId, $pendingTransaction);
-        
+
         if ($createOrderAfterPayment === 1) {
             $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId);
         }
@@ -322,7 +328,14 @@ class PostFinanceCheckoutTransactionService
                 'iframe'
             );
 
-        $chosenPaymentMethod = \strtolower($_SESSION['Zahlungsart']->cModulId);
+        $paymentMethod = $_SESSION['Zahlungsart'] ?? null;
+        if ($paymentMethod) {
+            $chosenPaymentMethod = \strtolower($_SESSION['Zahlungsart']->cModulId);
+        } else {
+            $paymentMethodEntity = new Zahlungsart((int)$_SESSION['AktiveZahlungsart']);
+            $chosenPaymentMethod = \strtolower($paymentMethodEntity->cModulId);
+        }
+
         foreach ($possiblePaymentMethods as $possiblePaymentMethod) {
             if (PostFinanceCheckoutHelper::PAYMENT_METHOD_PREFIX . '_' . $possiblePaymentMethod->getId() === $chosenPaymentMethod) {
                 return $possiblePaymentMethod;
@@ -485,7 +498,7 @@ class PostFinanceCheckoutTransactionService
         $newTransaction->space_id = $this->spaceId;
         $newTransaction->state = TransactionState::PENDING;
         $newTransaction->created_at = date('Y-m-d H:i:s');
-        
+
         Shop::Container()->getDB()->delete('postfinancecheckout_transactions', 'transaction_id', $transactionId);
         Shop::Container()->getDB()->insert('postfinancecheckout_transactions', $newTransaction);
     }
@@ -524,7 +537,7 @@ class PostFinanceCheckoutTransactionService
             $incomingPayment->cZahlungsanbieter = $order->cZahlungsartName;
             $incomingPayment->cHinweis = $transactionId;
             $paymentMethod->addIncomingPayment($order, $incomingPayment);
-            
+
             // At this stage, the transaction goes directly to fulfill, so it's also authorized.
             // Even when the sendEmail is invoked here, the email will be or not sent according to several conditions.
             $this->sendEmail($orderId, 'fulfill');
@@ -544,7 +557,7 @@ class PostFinanceCheckoutTransactionService
         $transaction = $this->getTransactionFromPortal($transactionId);
         $orderNr = $transaction->getMetaData()['order_nr'];
         $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
-        
+
         if ($this->isPreventFromDuplicatedOrders()) {
             // We check if order exist with such order nr. If yes, we select it's data, if not - we create it.
             // This check prevents only in these cases when webhook is triggered more than once or user refresh the page, or
@@ -574,7 +587,7 @@ class PostFinanceCheckoutTransactionService
 
         return (int)$order->kBestellung;
     }
-    
+
     /**
      * @param string $orderNr
      * @return void
@@ -582,13 +595,13 @@ class PostFinanceCheckoutTransactionService
     public function getOrderIfExists(string $orderNr): ?stdClass
     {
         $db = Shop::Container()->getDB();
-        
+
         // Prepare and execute the query directly
         $query = "SELECT kBestellung FROM tbestellung WHERE cBestellNr = :orderNr ORDER BY dErstellt DESC LIMIT 1";
         $params = ['orderNr' => $orderNr];
-        
+
         $data = $db->executeQueryPrepared($query, $params, 1); // The '1' here signifies to fetch one row only
-        
+
         // Check if data is retrieved, otherwise return null
         return $data ?: null;
     }
@@ -626,7 +639,7 @@ class PostFinanceCheckoutTransactionService
                 [$transactionId],
                 (object)$data
             );
-        
+
         if ($orderId && $state === TransactionState::AUTHORIZED) {
             $this->sendEmail($orderId, 'authorization');
         }
@@ -657,12 +670,12 @@ class PostFinanceCheckoutTransactionService
     {
         $lineItem = new LineItemCreate();
         $name = \is_array($productData->cName) ? $productData->cName[$_SESSION['cISOSprache']] : $productData->cName;
-        $lineItem->setName($name);
+        $lineItem->setName(html_entity_decode($name));
 
         $slug = strtolower(str_replace([' ', '+', '%', '[', ']', '=>'], ['-', '', '', '', '', '-'], $name));
         $slug = preg_replace('/-+/', '-', $slug);
         $slug = trim($slug, '-');
-        
+
         $uniqueName = $productData->cArtNr ?: $slug;
         $uniqueProperty = $productData->cUnique ?? null;
         if ($uniqueProperty !== null) {
@@ -676,7 +689,7 @@ class PostFinanceCheckoutTransactionService
                 if (strpos(strtolower($attribute->cTyp), 'freifeld') === false) {
                     continue;
                 }
-                
+
                 // If there's custom attribute with type TEXT (for example merchant adds his name to be printed on Jacket)
                 // them this custom text will be slugified and added to unique id
                 // cEigenschaftName - array of attribute name by language
@@ -728,6 +741,7 @@ class PostFinanceCheckoutTransactionService
     {
         $lineItem = new LineItemCreate();
         $name = \is_array($productData->cName) ? $productData->cName[$_SESSION['cISOSprache']] : $productData->cName;
+		$name = html_entity_decode($name);
         $lineItem->setName('Shipping: ' . $name);
         $lineItem->setUniqueId('shipping: ' . $name);
         $lineItem->setSku('shipping: ' . $name);
@@ -745,7 +759,7 @@ class PostFinanceCheckoutTransactionService
 
         return $lineItem;
     }
-    
+
     /**
      * @param string $text
      * @return string
@@ -846,7 +860,7 @@ class PostFinanceCheckoutTransactionService
 
         return $shippingAddress;
     }
-    
+
     /**
      * @return bool
      */
