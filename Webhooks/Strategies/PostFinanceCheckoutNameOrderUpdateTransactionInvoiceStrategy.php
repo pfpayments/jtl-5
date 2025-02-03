@@ -3,6 +3,7 @@
 namespace Plugin\jtl_postfinancecheckout\Webhooks\Strategies;
 
 use JTL\Shop;
+use JTL\Checkout\Bestellung;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutOrderService;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\Webhooks\Strategies\Interfaces\PostFinanceCheckoutOrderUpdateStrategyInterface;
@@ -34,25 +35,25 @@ class PostFinanceCheckoutNameOrderUpdateTransactionInvoiceStrategy implements Po
     public function updateOrderStatus(string $entityId): void
     {
         $transactionInvoice = $this->transactionService->getTransactionInvoiceFromPortal($entityId);
+        if ($transactionInvoice === null) {
+            print 'Transaction Invoice ' . $entityId . ' not found';
+            exit;
+        }
 
         $transaction = $transactionInvoice->getCompletion()
             ->getLineItemVersion()
             ->getTransaction();
-        
-        
-        $orderNr = $transaction->getMetaData()['order_nr'];
+
+        if ($transaction === null) {
+            print 'Transaction for Transaction Invoice  ' . $entityId . ' not found';
+            exit;
+        }
+
         $transactionId = $transaction->getId();
-        
-        // Fallback for older plugin versions
-        if ($orderNr === null) {
-            $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
-            $orderId = (int)$localTransaction->order_id;
-        } else {
-            $orderData = $this->transactionService->getOrderIfExists($orderNr);
-            if ($orderData === null) {
-                return;
-            }
-            $orderId = (int)$orderData->kBestellung;
+        $orderId = $this->transactionService->getOrderId($transaction);
+        if ($orderId === 0) {
+            print 'Order not found for transaction ' . $transactionId;
+            exit;
         }
 
         switch ($transactionInvoice->getState()) {

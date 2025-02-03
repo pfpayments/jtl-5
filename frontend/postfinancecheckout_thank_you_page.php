@@ -13,8 +13,6 @@ $transactionId = (int)$_GET['tID'] ?? null;
 if ($transactionId) {
     $apiClient = new PostFinanceCheckoutApiClient($plugin->getId());
     $transactionService = new PostFinanceCheckoutTransactionService($apiClient->getApiClient(), $plugin);
-    $localTransaction = $transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
-    $orderId = (int) $localTransaction->order_id;
     $transaction = $transactionService->getTransactionFromPortal($transactionId);
     $createAfterPayment = (int)$transaction->getMetaData()['orderAfterPayment'] ?? 1;
     if ($createAfterPayment) {
@@ -22,7 +20,12 @@ if ($transactionId) {
         $data = $transactionService->getOrderIfExists($orderNr);
         if ($data === null) {
             $orderId = $transactionService->createOrderAfterPayment($transactionId);
+        } else {
+            $orderId = (int)$data->kBestellung;
         }
+    } else {
+        $localTransaction = $transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
+        $orderId = (int) $localTransaction->order_id;
     }
 }
 

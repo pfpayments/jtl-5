@@ -40,6 +40,9 @@ use PostFinanceCheckout\Sdk\Model\{AddressCreate,
 
 class PostFinanceCheckoutTransactionService
 {
+    private const MAX_RETRIES = 12;
+    private const PAUSE_DURATION = 5;
+
     /**
      * @var ApiClient $apiClient
      */
@@ -128,69 +131,59 @@ class PostFinanceCheckoutTransactionService
      * @param Transaction $transaction
      * @return void
      */
-    public function confirmTransaction(Transaction $transaction): void
+    public function confirmTransaction(Transaction $pendingTransaction): void
     {
-        $transactionId = $transaction->getId();
-        $pendingTransaction = new TransactionPending();
-        $pendingTransaction->setId($transactionId);
-        $pendingTransaction->setVersion($transaction->getVersion());
-
+        $transactionId = $pendingTransaction->getId();
         $lineItems = $this->getLineItems($_SESSION['Warenkorb']->PositionenArr);
         $pendingTransaction->setLineItems($lineItems);
         $pendingTransaction->setCurrency($_SESSION['cWaehrungName']);
         $pendingTransaction->setLanguage(PostFinanceCheckoutHelper::getLanguageString());
+        $pendingTransaction->setBillingAddress($this->createBillingAddress());
+        $pendingTransaction->setShippingAddress($this->createShippingAddress());
 
         $obj = Shop::Container()->getDB()->selectSingleRow('tzahlungsart', 'kZahlungsart', (int)$_SESSION['AktiveZahlungsart']);
         $createOrderAfterPayment = (int)$obj->nWaehrendBestellung ?? 1;
+        $orderReferenceNumber = null;
 
-        $orderNumber = null;
+        $order = new \stdClass();
+        $order->transaction_id = $transactionId;
+        $order->payment_method = $_SESSION['possiblePaymentMethodName'];
+        $order->space_id = $this->spaceId;
+        $order->state = TransactionState::PENDING;
+        $order->created_at = date('Y-m-d H:i:s');
+
         if ($createOrderAfterPayment === 1) {
             $orderId = null;
             if ($this->isPreventFromDuplicatedOrders()) {
-                [$orderNr, $orderNumber] = PostFinanceCheckoutHelper::createOrderNo();
+                [$orderNr, $orderReferenceNumber] = PostFinanceCheckoutHelper::createOrderNo();
                 $transactionByOrderReference = $this->getTransactionByOrderReference($orderNr);
 
                 if ($transactionByOrderReference) {
-                    [$orderNr, $orderNumber] = PostFinanceCheckoutHelper::createOrderNo();
-                    $pendingTransaction->setVersion($transaction->getVersion() + 1);
+                    [$orderNr, $orderReferenceNumber] = PostFinanceCheckoutHelper::createOrderNo();
+                    $pendingTransaction->setVersion($pendingTransaction->getVersion() + 1);
                     $pendingTransaction->setMerchantReference($orderNr);
                     $this->apiClient->getTransactionService()->update($this->spaceId, $pendingTransaction);
                 }
             } else {
-                [$orderNr, $orderNumber] = PostFinanceCheckoutHelper::createOrderNo(false);
+                [$orderNr, $orderReferenceNumber] = PostFinanceCheckoutHelper::createOrderNo(false);
             }
 
-            $order = new \stdClass();
-            $order->transaction_id = $transactionId;
             $order->data = json_encode([]);
-            $order->payment_method = $_SESSION['possiblePaymentMethodName'];
             $order->order_id = null;
-            $order->space_id = $this->spaceId;
-            $order->state = TransactionState::PENDING;
-            $order->created_at = date('Y-m-d H:i:s');
-            $this->createLocalPostFinanceCheckoutTransaction((string)$transactionId, (array)$order);
         } else {
             $orderId = $_SESSION['kBestellung'] ?? $_SESSION['oBesucher']->kBestellung;
-            $orderNr = $_SESSION['BestellNr'] ?? $_SESSION['nextOrderNr'];
-
-            $order = new \stdClass();
-            $order->transaction_id = $transactionId;
+            $orderNr = $_SESSION['BestellNr'] ?? null;
             $order->data = json_encode((array)$order);
-            $order->payment_method = $_SESSION['possiblePaymentMethodName'];
             $order->order_id = $orderId;
-            $order->space_id = $this->spaceId;
-            $order->state = TransactionState::PENDING;
-            $order->created_at = date('Y-m-d H:i:s');
-
-            $this->createLocalPostFinanceCheckoutTransaction((string)$transactionId, (array)$order);
         }
+        $this->createLocalPostFinanceCheckoutTransaction((string)$transactionId, (array)$order);
 
         $pendingTransaction->setMetaData([
             'orderId' => $orderId,
             'spaceId' => $this->spaceId,
             'orderAfterPayment' => $createOrderAfterPayment,
             'order_nr' => $orderNr,
-            'order_no' => $orderNumber
+            'order_no' => $orderReferenceNumber
         ]);
 
         $pendingTransaction->setMerchantReference($orderNr);
@@ -220,31 +213,18 @@ class PostFinanceCheckoutTransactionService
      * @param string $orderNr
      * @return array
      */
-    protected function getTransactionByOrderReference(string $orderNr): array
-    {
-        $states = [
-            TransactionState::CONFIRMED,
-            TransactionState::PROCESSING,
-            TransactionState::FULFILL,
-        ];
-
-        $filters = array_map(function($state) use ($orderNr) {
-            return (new EntityQueryFilter())
-                ->setType(EntityQueryFilterType::_AND)
-                ->setChildren([
-                    $this->getEntityFilter('state', $state),
-                    $this->getEntityFilter('merchantReference', $orderNr),
-                ]);
-        }, $states);
-
+	protected function getTransactionByOrderReference(string $orderNr): array
+	{
         $entityQueryFilter = (new EntityQueryFilter())
-            ->setType(EntityQueryFilterType::_OR)
-            ->setChildren($filters);
+            ->setType(EntityQueryFilterType::_AND)
+            ->setChildren([
+            $this->getEntityFilter('merchantReference', $orderNr),
+        ]);
 
         $query = (new EntityQuery())->setFilter($entityQueryFilter);
 
         return $this->apiClient->getTransactionService()->search($this->spaceId, $query);
-    }
+	}
 
     /**
      * Creates and returns a new entity filter.
@@ -273,13 +253,8 @@ class PostFinanceCheckoutTransactionService
     {
         $pendingTransaction = new TransactionPending();
         $transaction = $this->getTransactionFromPortal($transactionId);
-        $statesToUpdate = [
-          TransactionState::DECLINE,
-          TransactionState::FAILED,
-          TransactionState::VOIDED,
-          TransactionState::PROCESSING
-        ];
-        if (empty($transaction) || empty($transaction->getVersion()) || in_array($transaction->getState(), $statesToUpdate)) {
+
+        if (empty($transaction) || empty($transaction->getVersion()) || $transaction->getState() !== TransactionState::PENDING) {
           $_SESSION['transactionId'] = null;
           $translations = PostFinanceCheckoutHelper::getTranslations($this->plugin->getLocalization(), [
             'jtl_postfinancecheckout_transaction_timeout',
@@ -567,8 +542,7 @@ class PostFinanceCheckoutTransactionService
                 // Order wasn't created before, so we insert new record
                 $order = $orderHandler->finalizeOrder($orderNr, false);
             } else {
-                // We select order from database and creating backup with all session data
-                $order = new Bestellung((int)$data->kBestellung);
+                return $data->kBestellung;
             }
         } else {
             // Updates order number for next order. Increase by 1 if is needed
@@ -585,7 +559,7 @@ class PostFinanceCheckoutTransactionService
             $this->addIncommingPayment((string)$transactionId, $orderData, $transaction);
         }
 
-        return (int)$order->kBestellung;
+        return $order->kBestellung;
     }
 
     /**
@@ -597,13 +571,17 @@ class PostFinanceCheckoutTransactionService
         $db = Shop::Container()->getDB();
 
         // Prepare and execute the query directly
-        $query = "SELECT kBestellung FROM tbestellung WHERE cBestellNr = :orderNr ORDER BY dErstellt DESC LIMIT 1";
+        $query = "SELECT kBestellung, cBestellNr FROM tbestellung WHERE cBestellNr = :orderNr ORDER BY dErstellt DESC LIMIT 1";
         $params = ['orderNr' => $orderNr];
 
-        $data = $db->executeQueryPrepared($query, $params, 1); // The '1' here signifies to fetch one row only
+        $data = $db->executeQueryPrepared($query, $params, 1); // Fetch one row only
 
-        // Check if data is retrieved, otherwise return null
-        return $data ?: null;
+        // Check if $data is an object and contains the expected property
+        if (is_object($data) && isset($data->cBestellNr) && (string) $data->cBestellNr === $orderNr) {
+            return $data;
+        }
+
+        return null;
     }
 
     /**
@@ -643,6 +621,57 @@ class PostFinanceCheckoutTransactionService
         if ($orderId && $state === TransactionState::AUTHORIZED) {
             $this->sendEmail($orderId, 'authorization');
         }
+    }
+
+    /**
+     * Order ID sometimes comes too late, so we need to wait first until order is created.
+     * @param $transaction
+     * @return void
+     */
+    public function waitUntilOrderIsCreated($transaction): void
+    {
+        $orderNr = $transaction->getMetaData()['order_nr'] ?? null;
+        if ($orderNr === null) {
+            return;
+        }
+
+        for ($attempt = 0; $attempt < self::MAX_RETRIES; $attempt++) {
+            $orderData = $this->getOrderIfExists($orderNr);
+
+            if (isset($orderData->kBestellung)) {
+                return; // Order found, exit the method
+            }
+
+            sleep(self::PAUSE_DURATION);
+        }
+
+        // Log a warning or handle the case where the order was not found after retries
+        Shop::Container()->getLogService()->warning(
+            "Order not found for Transaction {$transaction->getId()} after " . self::MAX_RETRIES . " attempts."
+        );
+    }
+
+    /**
+     * @param Transaction $transaction
+     * @return int
+     */
+    public function getOrderId(Transaction $transaction): int
+    {
+        // Fallback for older versions when 'order_nr' was not set to metadata
+        $orderNr = $transaction->getMetaData()['order_nr'] ?? null;
+        if ($orderNr === null) {
+            $transactionId = (string) $transaction->getId();
+            $localTransaction = $this->getLocalPostFinanceCheckoutTransactionById($transactionId);
+            $orderId = (int)$localTransaction->order_id ?? 0;
+        } else {
+            $orderData = $this->getOrderIfExists($orderNr);
+            if ($orderData === null) {
+                return 0;
+            }
+            $orderId = (int)$orderData->kBestellung;
+        }
+
+        return $orderId;
     }
 
     private function downloadDocument($document)
@@ -786,7 +815,10 @@ class PostFinanceCheckoutTransactionService
      */
     private function createBillingAddress(): AddressCreate
     {
-        $customer = $_SESSION['Kunde'];
+        $customer = $_SESSION['orderData']?->oRechnungsadresse;
+        if ($customer === null) {
+            $customer = $_SESSION['Kunde'];
+        }
 
         $billingAddress = new AddressCreate();
         $billingAddress->setStreet($customer->cStrasse . ' ' . $customer->cHausnummer);
@@ -796,7 +828,7 @@ class PostFinanceCheckoutTransactionService
         $billingAddress->setFamilyName($customer->cNachname);
         $billingAddress->setGivenName($customer->cVorname);
         $billingAddress->setPostCode($customer->cPLZ);
-        $billingAddress->setPostalState($customer->cBundesland);
+        $billingAddress->setPostalState($customer->cLand ?? $customer->cBundesland);
         $billingAddress->setOrganizationName($customer->cFirma);
         $billingAddress->setPhoneNumber($customer->cMobil);
 
@@ -823,7 +855,11 @@ class PostFinanceCheckoutTransactionService
             $billingAddress->setDateOfBirth($birthday);
         }
 
-        $gender = $_SESSION['orderData']?->oKunde?->cAnrede ?? '';
+        $gender = $_SESSION['orderData']?->oRechnungsadresse?->cAnrede ?? '';
+        if (empty($gender)) {
+            $gender = $_SESSION['orderData']?->oKunde?->cAnrede ?? '';
+        }
+
         if ($gender !== null) {
             $billingAddress->setGender($gender === 'm' ? Gender::MALE : Gender::FEMALE);
             $billingAddress->setSalutation($gender === 'm' ? 'Mr' : 'Ms');
@@ -837,7 +873,10 @@ class PostFinanceCheckoutTransactionService
      */
     private function createShippingAddress(): AddressCreate
     {
-        $customer = $_SESSION['Lieferadresse'];
+        $customer = $_SESSION['orderData']?->Lieferadresse;
+        if ($customer === null) {
+            $customer = $_SESSION['Kunde'];
+        }
 
         $shippingAddress = new AddressCreate();
         $shippingAddress->setStreet($customer->cStrasse . ' ' . $customer->cHausnummer);
@@ -847,12 +886,16 @@ class PostFinanceCheckoutTransactionService
         $shippingAddress->setFamilyName($customer->cNachname);
         $shippingAddress->setGivenName($customer->cVorname);
         $shippingAddress->setPostCode($customer->cPLZ);
-        $shippingAddress->setPostalState($customer->cBundesland);
+        $shippingAddress->setPostalState($customer->cLand ?? $customer->cBundesland);
         $shippingAddress->setOrganizationName($customer->cFirma);
         $shippingAddress->setPhoneNumber($customer->cMobil);
         $shippingAddress->setSalutation($customer->cTitel);
 
-        $gender = $_SESSION['orderData']?->oKunde?->cAnrede ?? null;
+        $gender = $_SESSION['orderData']?->Lieferadresse?->cAnrede ?? '';
+        if (empty($gender)) {
+            $gender = $_SESSION['orderData']?->oKunde?->cAnrede ?? null;
+        }
+
         if ($gender !== null) {
             $shippingAddress->setGender($gender === 'm' ? Gender::MALE : Gender::FEMALE);
             $shippingAddress->setSalutation($gender === 'm' ? 'Mr' : 'Ms');

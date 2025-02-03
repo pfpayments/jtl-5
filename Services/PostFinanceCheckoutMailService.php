@@ -111,8 +111,7 @@ class PostFinanceCheckoutMailService {
                 $this->send($data, $template);
                 $this->updateDatabase($orderId, $template);
             }
-        }
-        catch (Exception $e) {
+        } catch (\Exception $e) {
             // Handle errors (logging, retries, etc.)
             error_log("Error sending mail for template : " . $template . " : " . $e->getMessage());
         }

@@ -1,6 +1,7 @@
 <?php declare(strict_types=1);
 
 use JTL\Shop;
+use JTL\Alert\Alert;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutApiClient;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;

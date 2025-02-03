@@ -44,24 +44,20 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
     public function updateOrderStatus(string $entityId): void
     {
         $transaction = $this->transactionService->getTransactionFromPortal($entityId);
-        $transactionId = $transaction->getId();
-        
-        $orderNr = $transaction->getMetaData()['order_nr'];
-        if ($orderNr === null) {
-            $localTransaction = $this->transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
-            $orderId = (int)$localTransaction->order_id;
-        } else {
-            $orderData = $this->transactionService->getOrderIfExists($orderNr);
-            if ($orderData === null) {
-                return;
-            }
-            $orderId = (int)$orderData->kBestellung;
+        if ($transaction === null) {
+            print 'Transaction ' . $entityId . ' not found';
+            exit;
         }
 
+        $transactionId = $transaction->getId();
         $transactionState = $transaction->getState();
-    
         switch ($transactionState) {
             case TransactionState::FULFILL:
+                $orderId = $this->transactionService->getOrderId($transaction);
+                if ($orderId === 0) {
+                    print 'Order not found for transaction ' . $entityId;
+                    exit;
+                }
                 $order = new Bestellung($orderId);
                 $this->transactionService->addIncommingPayment((string)$transactionId, $order, $transaction);
                 break;
@@ -77,6 +73,7 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
             case TransactionState::DECLINE:
             case TransactionState::VOIDED:
             case TransactionState::FAILED:
+                $orderId = $this->transactionService->getOrderId($transaction);
                 if ($orderId > 0) {
                     $order = new Bestellung($orderId);
                     $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
