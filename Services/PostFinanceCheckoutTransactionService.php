@@ -42,6 +42,8 @@ class PostFinanceCheckoutTransactionService
 {
     private const MAX_RETRIES = 12;
     private const PAUSE_DURATION = 5;
+    public const LET_SYNC_TO_WAWI = 'N';
+    public const NOT_SYNC_TO_WAWI = 'Y';
 
     /**
      * @var ApiClient $apiClient
@@ -153,7 +155,6 @@ class PostFinanceCheckoutTransactionService
         $order->created_at = date('Y-m-d H:i:s');
 
         if ($createOrderAfterPayment === 1) {
-            $orderId = null;
             if ($this->isPreventFromDuplicatedOrders()) {
                 [$orderNr, $orderReferenceNumber] = PostFinanceCheckoutHelper::createOrderNo();
                 $transactionByOrderReference = $this->getTransactionByOrderReference($orderNr);
@@ -168,8 +169,18 @@ class PostFinanceCheckoutTransactionService
                 [$orderNr, $orderReferenceNumber] = PostFinanceCheckoutHelper::createOrderNo(false);
             }
 
+            $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
+
+            // We create order and add all required related data to it with fuelleBestellung
+            $orderData = $orderHandler->finalizeOrder($orderNr, false);
+            $orderData->fuelleBestellung(true);
+
+            $orderId = (int) $orderData->kBestellung;
+            // We tell to wawi do not synchronise it, because it's not paid yet. Wawi do not have pending state, so, we have to tell that it's already synchronised.
+            // Later, when payment is accepted, we change the flag to N and ask Wawi to synchronise it.
+            $this->updateWawiSyncFlag($orderId, self::NOT_SYNC_TO_WAWI);
             $order->data = json_encode([]);
-            $order->order_id = null;
+            $order->order_id = $orderId;
         } else {
             $orderId = $_SESSION['kBestellung'] ?? $_SESSION['oBesucher']->kBestellung;
             $orderNr = $_SESSION['BestellNr'] ?? null;
@@ -463,7 +474,7 @@ class PostFinanceCheckoutTransactionService
      * @param array $orderData
      * @return void
      */
-    public function createLocalPostFinanceCheckoutTransaction(string $transactionId, array $orderData): void
+    public function createLocalPostFinanceCheckoutTransaction(string $transactionId, array $orderData, $state = TransactionState::PENDING): void
     {
         $newTransaction = new \stdClass();
         $newTransaction->transaction_id = $transactionId;
@@ -471,7 +482,7 @@ class PostFinanceCheckoutTransactionService
         $newTransaction->payment_method = $orderData['payment_method'];
         $newTransaction->order_id = $orderData['order_id'];
         $newTransaction->space_id = $this->spaceId;
-        $newTransaction->state = TransactionState::PENDING;
+        $newTransaction->state = $state;
         $newTransaction->created_at = date('Y-m-d H:i:s');
 
         Shop::Container()->getDB()->delete('postfinancecheckout_transactions', 'transaction_id', $transactionId);
@@ -484,7 +495,7 @@ class PostFinanceCheckoutTransactionService
      * @param Transaction $transaction
      * @return void
      */
-    public function addIncommingPayment(string $transactionId, Bestellung $order, Transaction $transaction): void
+    public function addIncomingPayment(string $transactionId, Bestellung $order, Transaction $transaction): void
     {
         $orderId = (int)$order->kBestellung;
         if ($orderId === 0) {
@@ -517,71 +528,8 @@ class PostFinanceCheckoutTransactionService
             // Even when the sendEmail is invoked here, the email will be or not sent according to several conditions.
             $this->sendEmail($orderId, 'fulfill');
         } else {
-            Shop::Container()->getLogService()->error('addIncommingPayment payment was not created, because transaction was not in FULFILL status. TransactionId: ' . $transactionId);
+            Shop::Container()->getLogService()->error('addIncomingPayment payment was not created, because transaction was not in FULFILL status. TransactionId: ' . $transactionId);
         }
-    }
-
-    /**
-     * @param int $transactionId
-     * @return int
-     */
-    public function createOrderAfterPayment(int $transactionId): int
-    {
-        $_SESSION['finalize'] = true;
-
-        $transaction = $this->getTransactionFromPortal($transactionId);
-        $orderNr = $transaction->getMetaData()['order_nr'];
-        $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
-
-        if ($this->isPreventFromDuplicatedOrders()) {
-            // We check if order exist with such order nr. If yes, we select it's data, if not - we create it.
-            // This check prevents only in these cases when webhook is triggered more than once or user refresh the page, or
-            // got lost internet connection. It's more like catching edge case
-            $data = $this->getOrderIfExists($orderNr);
-            if ($data === null) {
-                // Order wasn't created before, so we insert new record
-                $order = $orderHandler->finalizeOrder($orderNr, false);
-            } else {
-                return $data->kBestellung;
-            }
-        } else {
-            // Updates order number for next order. Increase by 1 if is needed
-            $lastOrderNo = $transaction->getMetaData()['order_no'];
-            PostFinanceCheckoutHelper::createOrderNo(true, $lastOrderNo);
-            // Always inserting new order
-            $order = $orderHandler->finalizeOrder($orderNr, false);
-        }
-        $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::AUTHORIZED, (int)$order->kBestellung);
-
-        if ($transaction->getState() === TransactionState::FULFILL) {
-            // fuelleBestellung - JTL5 native function to append all required data to order
-            $orderData = $order->fuelleBestellung(true);
-            $this->addIncommingPayment((string)$transactionId, $orderData, $transaction);
-        }
-
-        return $order->kBestellung;
-    }
-
-    /**
-     * @param string $orderNr
-     * @return void
-     */
-    public function getOrderIfExists(string $orderNr): ?stdClass
-    {
-        $db = Shop::Container()->getDB();
-
-        // Prepare and execute the query directly
-        $query = "SELECT kBestellung, cBestellNr FROM tbestellung WHERE cBestellNr = :orderNr ORDER BY dErstellt DESC LIMIT 1";
-        $params = ['orderNr' => $orderNr];
-
-        $data = $db->executeQueryPrepared($query, $params, 1); // Fetch one row only
-
-        // Check if $data is an object and contains the expected property
-        if (is_object($data) && isset($data->cBestellNr) && (string) $data->cBestellNr === $orderNr) {
-            return $data;
-        }
-
-        return null;
     }
 
     /**
@@ -621,57 +569,6 @@ class PostFinanceCheckoutTransactionService
         if ($orderId && $state === TransactionState::AUTHORIZED) {
             $this->sendEmail($orderId, 'authorization');
         }
-    }
-
-    /**
-     * Order ID sometimes comes too late, so we need to wait first until order is created.
-     * @param $transaction
-     * @return void
-     */
-    public function waitUntilOrderIsCreated($transaction): void
-    {
-        $orderNr = $transaction->getMetaData()['order_nr'] ?? null;
-        if ($orderNr === null) {
-            return;
-        }
-
-        for ($attempt = 0; $attempt < self::MAX_RETRIES; $attempt++) {
-            $orderData = $this->getOrderIfExists($orderNr);
-
-            if (isset($orderData->kBestellung)) {
-                return; // Order found, exit the method
-            }
-
-            sleep(self::PAUSE_DURATION);
-        }
-
-        // Log a warning or handle the case where the order was not found after retries
-        Shop::Container()->getLogService()->warning(
-            "Order not found for Transaction {$transaction->getId()} after " . self::MAX_RETRIES . " attempts."
-        );
-    }
-
-    /**
-     * @param Transaction $transaction
-     * @return int
-     */
-    public function getOrderId(Transaction $transaction): int
-    {
-        // Fallback for older versions when 'order_nr' was not set to metadata
-        $orderNr = $transaction->getMetaData()['order_nr'] ?? null;
-        if ($orderNr === null) {
-            $transactionId = (string) $transaction->getId();
-            $localTransaction = $this->getLocalPostFinanceCheckoutTransactionById($transactionId);
-            $orderId = (int)$localTransaction->order_id ?? 0;
-        } else {
-            $orderData = $this->getOrderIfExists($orderNr);
-            if ($orderData === null) {
-                return 0;
-            }
-            $orderId = (int)$orderData->kBestellung;
-        }
-
-        return $orderId;
     }
 
     private function downloadDocument($document)
@@ -907,12 +804,24 @@ class PostFinanceCheckoutTransactionService
     /**
      * @return bool
      */
-    private function isPreventFromDuplicatedOrders(): bool
+    public function isPreventFromDuplicatedOrders(): bool
     {
         $config = PostFinanceCheckoutHelper::getConfigByID($this->plugin->getId());
         $preventFromDuplicatedOrders = $config[PostFinanceCheckoutHelper::PREVENT_FROM_DUPLICATED_ORDERS] ?? null;
 
         return strtolower($preventFromDuplicatedOrders) === 'yes';
+    }
+
+    /**
+     * @param string $orderReference
+     * @return void
+     */
+    public function handleNextOrderReferenceNumber(string $orderReference): void
+    {
+        if ($this->isPreventFromDuplicatedOrders() === false) {
+            // Updates order number for next order. Increase by 1 if is needed
+            PostFinanceCheckoutHelper::createOrderNo(true, $orderReference);
+        }
     }
 
     /**
@@ -927,6 +836,21 @@ class PostFinanceCheckoutTransactionService
         if (!$this->mailService->isEmailSent($orderId, $template)) {
             $this->mailService->sendMail($orderId, $template);
         }
+    }
+
+    /**
+     * @param int $orderId
+     * @param $flag
+     * @return void
+     */
+    public function updateWawiSyncFlag(int $orderId, $flag) {
+        Shop::Container()
+            ->getDB()->update(
+            'tbestellung',
+            ['kBestellung',],
+            [$orderId],
+            (object)['cAbgeholt' => $flag]
+        );
     }
 }
 

@@ -466,7 +466,7 @@
                     </SelectboxOptions>
                 </Setting>
 
-                <Setting type="selectbox" initialValue="NO" sort="8" conf="Y">
+                <Setting type="selectbox" initialValue="YES" sort="8" conf="Y">
                     <Name>Prevent From Duplicated Order No</Name>
                     <ValueName>jtl_postfinancecheckout_prevent_from_duplicated_orders</ValueName>
                     <SelectboxOptions>

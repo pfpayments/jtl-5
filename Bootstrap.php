@@ -33,7 +33,7 @@ class Bootstrap extends Bootstrapper
      * @var PostFinanceCheckoutPaymentService|null
      */
     private ?PostFinanceCheckoutPaymentService $paymentService = null;
-    
+
     /**
      * @var PostFinanceCheckoutTransactionService|null
      */
@@ -136,13 +136,13 @@ class Bootstrap extends Bootstrapper
             if ($transactionId) {
                 $lastCartItemsHash = $_SESSION['lastCartItemHash'] ?? null;
                 $lineItems = $_SESSION['Warenkorb']?->PositionenArr;
-                
+
                 if ($lineItems === null) {
                     return;
                 }
 
                 $cartItemsHash = md5(json_encode($lineItems));
-                
+
                 if ($lastCartItemsHash !== $cartItemsHash) {
                     $_SESSION['lastCartItemHash'] = $cartItemsHash;
                     $transactionService = $this->getTransactionService();
@@ -158,9 +158,9 @@ class Bootstrap extends Bootstrapper
 
         $dispatcher->listen('shop.hook.' . \HOOK_SMARTY_OUTPUTFILTER, [$handler, 'contentUpdate']);
         $dispatcher->listen('shop.hook.' . \HOOK_BESTELLABSCHLUSS_INC_BESTELLUNGINDB_ENDE, function ($args) use ($handler) {
-            if (isset($_SESSION['finalize']) && $_SESSION['finalize'] === true) {
-                unset($_SESSION['finalize']);
-            } else {
+            $obj = Shop::Container()->getDB()->selectSingleRow('tzahlungsart', 'kZahlungsart', (int)$_SESSION['AktiveZahlungsart']);
+            $createOrderAfterPayment = (int)$obj->nWaehrendBestellung ?? 1;
+            if ($createOrderAfterPayment === 0) {
                 if (isset($_SESSION['Zahlungsart']->cModulId) && str_contains(\strtolower($_SESSION['Zahlungsart']->cModulId), 'postfinancecheckout')) {
                     $redirectUrl = $handler->getRedirectUrlAfterCreatedTransaction($args['oBestellung']);
                     header("Location: " . $redirectUrl);
@@ -174,18 +174,19 @@ class Bootstrap extends Bootstrapper
             $paymentMethods = $handler->getPaymentMethodsForForm($smarty);
             $smarty->assign('Zahlungsarten', $paymentMethods);
         });
-        
-        $dispatcher->listen('shop.hook.' . \HOOK_BESTELLUNGEN_XML_BEARBEITESET, function ($args) use ($handler) {
+
+        $transactionService = $this->getTransactionService();
+        $dispatcher->listen('shop.hook.' . \HOOK_BESTELLUNGEN_XML_BEARBEITESET, function ($args) use ($handler, $transactionService) {
             $order = $args['oBestellung'] ?? null;
             if ($order === null) {
                 return;
             }
-            
+
             $orderStatus = $order->cStatus ?? null;
             if ($orderStatus === null) {
                 return;
             }
-            
+
             if ((int)$orderStatus === \BESTELLUNG_STATUS_BEZAHLT) {
                 $orderId = $args['oBestellung']->kBestellung ?? null;
                 if ($orderId === null) {
@@ -197,19 +198,12 @@ class Bootstrap extends Bootstrapper
                     return;
                 }
                 $paymentMethodEntity = new Zahlungsart($order->kZahlungsart);
-                
+
                 if ($order->cStatus != \BESTELLUNG_STATUS_VERSANDT && $paymentMethodEntity->cAnbieter === 'PostFinanceCheckout') {
                     $moduleId = $paymentMethodEntity->cModulId ?? '';
                     $paymentMethod = new Method($moduleId);
                     $paymentMethod->setOrderStatusToPaid($order);
-                    
-                    Shop::Container()
-                      ->getDB()->update(
-                        'tbestellung',
-                        ['kBestellung',],
-                        [$orderId],
-                        (object)['cAbgeholt' => 'Y']
-                    );
+                    $transactionService->updateWawiSyncFlag($orderId, $transactionService::NOT_SYNC_TO_WAWI);
                 }
             }
         });
@@ -237,7 +231,7 @@ class Bootstrap extends Bootstrapper
             $args_arr['continue'] = false;
         });
     }
-    
+
     /**
      * @param array $args
      * @return bool
@@ -251,7 +245,7 @@ class Bootstrap extends Bootstrapper
           'jtl_postfinancecheckout_user_id' => ['type' => 'numeric', 'message' => 'User ID must be a valid number.'],
           'jtl_postfinancecheckout_application_key' => ['type' => 'string', 'message' => 'Application Key cannot be empty.'],
         ];
-        
+
         // Validate form data
         foreach ($args['options'] as $option) {
             $rule = $validationRules[$option->valueID] ?? null;
@@ -263,13 +257,13 @@ class Bootstrap extends Bootstrapper
                 } elseif ($rule['type'] === 'string' && empty($option->value)) {
                     $errorFound = true;
                 }
-                
+
                 if ($errorFound) {
                     $this->addValidationError($rule['message'], $errors);
                 }
             }
         }
-        
+
         // Add further validation for space access only if no errors in basic validation
         if (empty($errors)) {
             $apiClient = $this->getApiClient();
@@ -277,16 +271,16 @@ class Bootstrap extends Bootstrapper
                 $this->validateSpaceAccess($apiClient, $errors);
             }
         }
-        
+
         return empty($errors);
     }
-    
+
     private function addValidationError(string $message, array &$errors): void {
         $errors[] = $message;
         // Second parameter is key. We want to display all errors at once, so let's make it dynamic
         Shop::Container()->getAlertService()->addDanger($message, 'isValidFormData' . md5($message));
     }
-    
+
     /**
      * @param ApiClient|null $apiClient
      * @param array $errors
@@ -295,7 +289,7 @@ class Bootstrap extends Bootstrapper
     private function validateSpaceAccess(ApiClient $apiClient, array &$errors): void {
         $config = PostFinanceCheckoutHelper::getConfigByID($this->getPlugin()->getId());
         $spaceId = $config[PostFinanceCheckoutHelper::SPACE_ID] ?? null;
-        
+
         try {
             $spaceData = $apiClient->getSpaceService()->read($spaceId);
             if (is_null($spaceData) || is_null($spaceData->getAccount())) {
@@ -322,7 +316,7 @@ class Bootstrap extends Bootstrapper
 
         return $this->paymentService;
     }
-    
+
     /**
      * @return PostFinanceCheckoutTransactionService|null
      */
@@ -332,11 +326,11 @@ class Bootstrap extends Bootstrapper
         if ($apiClient === null) {
             return null;
         }
-        
+
         if ($this->transactionService === null) {
             $this->transactionService = new PostFinanceCheckoutTransactionService($apiClient, $this->getPlugin());
         }
-        
+
         return $this->transactionService;
     }
 

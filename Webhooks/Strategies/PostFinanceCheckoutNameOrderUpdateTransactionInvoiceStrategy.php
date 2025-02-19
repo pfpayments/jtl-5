@@ -50,9 +50,9 @@ class PostFinanceCheckoutNameOrderUpdateTransactionInvoiceStrategy implements Po
         }
 
         $transactionId = $transaction->getId();
-        $orderId = $this->transactionService->getOrderId($transaction);
+        $orderId = (int)$transaction->getMetaData()['orderId'];
         if ($orderId === 0) {
-            print 'Order not found for transaction ' . $transactionId;
+            print 'Order not found for transaction ' . $entityId;
             exit;
         }
 
@@ -70,7 +70,8 @@ class PostFinanceCheckoutNameOrderUpdateTransactionInvoiceStrategy implements Po
                 }
 
                 $order = new Bestellung($orderId);
-                $this->transactionService->addIncommingPayment((string)$transactionId, $order, $transaction);
+                $this->transactionService->addIncomingPayment((string)$transactionId, $order, $transaction);
+                $this->transactionService->handleNextOrderReferenceNumber($transaction->getMetaData()['order_no']);
                 print 'Order ' . $orderId . ' status was updated to paid. Triggered by Transaction Invoice webhook.';
                 break;
         }

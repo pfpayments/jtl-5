@@ -55,10 +55,7 @@ class PostFinanceCheckoutNameOrderUpdateRefundStrategy implements PostFinanceChe
          * @var \PostFinanceCheckout\Sdk\Model\Refund $refund
          */
         $refund = $this->refundService->getRefundFromPortal($entityId);
-
-        $orderNr = $refund->getTransaction()->getMetaData()['order_nr'] ?? '';
-        $orderData = $this->transactionService->getOrderIfExists($orderNr);
-        $orderId = (int)$orderData?->kBestellung;
+        $orderId = (int)$refund->getTransaction()->getMetaData()['orderId'] ?? '';
 
         if (empty($orderId)) {
             $transactionId = (int)$refund->getTransaction()->getId();

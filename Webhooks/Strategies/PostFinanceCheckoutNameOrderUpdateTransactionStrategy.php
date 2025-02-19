@@ -7,6 +7,7 @@ use JTL\Checkout\Zahlungsart;
 use JTL\Plugin\Payment\Method;
 use JTL\Plugin\Plugin;
 use JTL\Shop;
+use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutOrderService;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\Webhooks\Strategies\Interfaces\PostFinanceCheckoutOrderUpdateStrategyInterface;
@@ -51,39 +52,53 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
 
         $transactionId = $transaction->getId();
         $transactionState = $transaction->getState();
+
+        $orderId = (int)$transaction->getMetaData()['orderId'];
+        if ($orderId === 0) {
+            print 'Order not found for transaction ' . $entityId;
+            exit;
+        }
+
         switch ($transactionState) {
             case TransactionState::FULFILL:
-                $orderId = $this->transactionService->getOrderId($transaction);
-                if ($orderId === 0) {
-                    print 'Order not found for transaction ' . $entityId;
-                    exit;
-                }
                 $order = new Bestellung($orderId);
-                $this->transactionService->addIncommingPayment((string)$transactionId, $order, $transaction);
-                break;
-
-            case TransactionState::PROCESSING:
-                $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
+                if ($order && (int )$order->cStatus !== \BESTELLUNG_STATUS_BEZAHLT) {
+                    $orderData = $order->fuelleBestellung();
+                    $this->transactionService->addIncomingPayment((string)$transactionId, $orderData, $transaction);
+                    $this->transactionService->updateWawiSyncFlag($orderId, $this->transactionService::LET_SYNC_TO_WAWI);
+                    $this->transactionService->handleNextOrderReferenceNumber($transaction->getMetaData()['order_no']);
+                }
                 break;
 
             case TransactionState::AUTHORIZED:
-                $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
+                $order = new Bestellung($orderId);
+                if ($order && (int )$order->cStatus === \BESTELLUNG_STATUS_OFFEN) {
+                    $this->transactionService->updateWawiSyncFlag($orderId, $this->transactionService::LET_SYNC_TO_WAWI);
+                    $this->transactionService->handleNextOrderReferenceNumber($transaction->getMetaData()['order_no']);
+                }
+                break;
+
+            case TransactionState::FAILED:
+                // Deleted the order from the shop, because transaction failed and order will never be finished.
+                // New transaction will be created with new order.
+                Shop::Container()->getDB()->delete('tbestellung', 'kBestellung', $orderId);
                 break;
 
             case TransactionState::DECLINE:
             case TransactionState::VOIDED:
-            case TransactionState::FAILED:
-                $orderId = $this->transactionService->getOrderId($transaction);
-                if ($orderId > 0) {
-                    $order = new Bestellung($orderId);
-                    $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                    $moduleId = $paymentMethodEntity->cModulId ?? '';
-                    $paymentMethod = new Method($moduleId);
-                    $paymentMethod->cancelOrder($orderId);
+                $order = new Bestellung($orderId);
+                $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+                $moduleId = $paymentMethodEntity->cModulId ?? '';
+                $paymentMethod = new Method($moduleId);
+                $paymentMethod->cancelOrder($orderId);
+
+                // If transaction was cancelled from portal - we delete leftovers from the shop
+                if ($order && (int )$order->cStatus === \BESTELLUNG_STATUS_OFFEN) {
+                    Shop::Container()->getDB()->delete('tbestellung', 'kBestellung', $orderId);
                 }
-                $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
                 print 'Order ' . $orderId . ' status was updated to cancelled';
                 break;
         }
+        $this->transactionService->updateTransactionStatus($transactionId, $transactionState);
     }
 }

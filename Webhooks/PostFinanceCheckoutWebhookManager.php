@@ -85,28 +85,13 @@ class PostFinanceCheckoutWebhookManager
             }
         }
 
-
         switch ($listenerEntityTechnicalName) {
             case PostFinanceCheckoutHelper::TRANSACTION:
-
-                $transaction = $this->transactionService->getTransactionFromPortal($entityId);
-                if ($transaction->getState() === TransactionState::FULFILL || $transaction->getState() === TransactionState::AUTHORIZED) {
-                    $this->transactionService->waitUntilOrderIsCreated($transaction);
-                }
-
                 $orderUpdater->updateOrderStatus($entityId);
                 break;
 
             case PostFinanceCheckoutHelper::TRANSACTION_INVOICE:
                 $orderUpdater->setStrategy(new PostFinanceCheckoutNameOrderUpdateTransactionInvoiceStrategy($this->transactionService));
-                $transactionInvoice = $this->transactionService->getTransactionInvoiceFromPortal($entityId);
-                $transaction = $transactionInvoice->getCompletion()
-                  ->getLineItemVersion()
-                  ->getTransaction();
-
-                if ($transaction->getState() === TransactionState::FULFILL || $transaction->getState() === TransactionState::AUTHORIZED) {
-                    $this->transactionService->waitUntilOrderIsCreated($transaction);
-                }
                 $orderUpdater->updateOrderStatus($entityId);
                 break;
 
