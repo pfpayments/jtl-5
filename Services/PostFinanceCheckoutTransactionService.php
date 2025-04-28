@@ -565,10 +565,6 @@ class PostFinanceCheckoutTransactionService
                 [$transactionId],
                 (object)$data
             );
-
-        if ($orderId && $state === TransactionState::AUTHORIZED) {
-            $this->sendEmail($orderId, 'authorization');
-        }
     }
 
     private function downloadDocument($document)
@@ -656,6 +652,9 @@ class PostFinanceCheckoutTransactionService
         $lineItem->setAmountIncludingTax($priceDecimal);
         $lineItem->setType($type);
 
+        // Taxes
+        $tax = $this->createTaxForLineItem($productData);
+        $lineItem->setTaxes([$tax]);
         return $lineItem;
     }
 
@@ -682,6 +681,10 @@ class PostFinanceCheckoutTransactionService
 
         $lineItem->setAmountIncludingTax($priceDecimal);
         $lineItem->setType(LineItemType::SHIPPING);
+
+        // Taxes
+        $tax = $this->createTaxForLineItem($productData);
+        $lineItem->setTaxes([$tax]);
 
         return $lineItem;
     }
@@ -712,7 +715,7 @@ class PostFinanceCheckoutTransactionService
      */
     private function createBillingAddress(): AddressCreate
     {
-        $customer = $_SESSION['orderData']?->oRechnungsadresse;
+        $customer = ($_SESSION['orderData'] ?? null)?->oRechnungsadresse;
         if ($customer === null) {
             $customer = $_SESSION['Kunde'];
         }
@@ -770,7 +773,7 @@ class PostFinanceCheckoutTransactionService
      */
     private function createShippingAddress(): AddressCreate
     {
-        $customer = $_SESSION['orderData']?->Lieferadresse;
+        $customer = ($_SESSION['orderData'] ?? null)?->Lieferadresse;
         if ($customer === null) {
             $customer = $_SESSION['Kunde'];
         }
@@ -851,6 +854,26 @@ class PostFinanceCheckoutTransactionService
             [$orderId],
             (object)['cAbgeholt' => $flag]
         );
+    }
+
+    /**
+     * Creates a TaxCreate object for a given cart item.
+     *
+     * This function calculates the tax rate and constructs a title for the tax,
+     * including the rate and VAT information. It then creates and returns a
+     * TaxCreate object with the calculated rate and title.
+     *
+     * @param CartItem $productData The cart item for which the tax is being created.
+     * @return TaxCreate The TaxCreate object containing the tax rate and title.
+     */
+    protected function createTaxForLineItem(CartItem $productData): TaxCreate {
+        $rate = CartItem::getTaxRate($productData);
+
+        // @see lang_steuerposition()
+        $showVat = Shop::getSettingValue(\CONF_GLOBAL, 'global_ust_auszeichnung') === 'autoNoVat' ? '' : ($rate . '% ');
+        $title = $showVat . Shop::Lang()->get('vat', 'productDetails');
+
+        return new TaxCreate(["rate" => $rate, "title" => $title]);
     }
 }
 

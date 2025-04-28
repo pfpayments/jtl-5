@@ -1,0 +1,35 @@
+{
+    "name": "postfinancecheckout/sdk",
+    "version": "4.8.0",
+	"description": "PostFinance Checkout SDK for PHP",
+	"keywords": [
+		"postfinancecheckout",
+		"payment",
+		"php",
+		"sdk",
+		"api"
+	],
+	"homepage": "http://github.com/pfpayments/php-sdk",
+	"license": "Apache-2.0",
+	"authors": [
+		{
+			"name": "wallee AG",
+			"email": "checkout@postfinance.ch",
+			"homepage": "https://postfinance.ch/en/business/products/e-commerce/postfinance-checkout-all-in-one.html"
+		}
+	],
+	"require": {
+		"php": ">=5.6",
+		"ext-json": "*",
+		"ext-mbstring": "*"
+	},
+	"require-dev": {
+		"phpunit/phpunit": "~8"
+	},
+	"autoload": {
+		"psr-4": { "PostFinanceCheckout\\Sdk\\" : "lib/" }
+	},
+	"autoload-dev": {
+		"psr-4": { "PostFinanceCheckout\\Sdk\\" : "test/" }
+	}
+}

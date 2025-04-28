@@ -1,9 +1,9 @@
 
 
-PostFinanceCheckout Payment for JTL 5.2 and 5.3
+PostFinance Checkout integration for JTL 5.2 and 5.3
 =============================
 
-The PostFinanceCheckout Payment plugin wraps around the PostFinanceCheckout API. This library facilitates your interaction with various services such as transactions.
+The PostFinance Checkout plugin wraps around the PostFinance Checkout API. This library facilitates your interaction with various services such as transactions.
 
 ## Requirements
 
@@ -27,16 +27,16 @@ The PostFinanceCheckout Payment plugin wraps around the PostFinanceCheckout API.
 
 5. After installation click on Settings "gear" icon
 
-6. Enter correct data from PostFinanceCheckout API and click Save. Payment methods will be synchronised and enabled
+6. Enter correct data from PostFinance Checkout API and click Save. Payment methods will be synchronised and enabled
 
 
 ## Usage
-The library needs to be configured with your account's space id, user id, and application key which are available in your PostFinanceCheckout
+The library needs to be configured with your account's space id, user id, and application key which are available in your PostFinance Checkout
 account dashboard.
 
 ## Documentation
 
-[Documentation](https://plugin-documentation.postfinance-checkout.ch/pfpayments/jtl-5/1.0.35/docs/en/documentation.html)
+[Documentation](https://plugin-documentation.postfinance-checkout.ch/pfpayments/jtl-5/1.0.36/docs/en/documentation.html)
 
 ## License
 

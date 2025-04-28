@@ -88,6 +88,12 @@ class PostFinanceCheckoutWebhookManager
         switch ($listenerEntityTechnicalName) {
             case PostFinanceCheckoutHelper::TRANSACTION:
                 $orderUpdater->updateOrderStatus($entityId);
+                $transactionStateFromWebhook = $this?->data['state'] ?? null;
+                if ($transactionStateFromWebhook === TransactionState::AUTHORIZED) {
+                    $transaction = $this->transactionService->getTransactionFromPortal($entityId);
+                    $orderId = (int)$transaction->getMetaData()['orderId'];
+                    $this->transactionService->sendEmail($orderId, 'authorization');
+                }
                 break;
 
             case PostFinanceCheckoutHelper::TRANSACTION_INVOICE:
