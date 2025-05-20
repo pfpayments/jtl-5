@@ -14,7 +14,7 @@ use Plugin\jtl_postfinancecheckout\Webhooks\Strategies\PostFinanceCheckoutNameOr
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutApiClient;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 use PostFinanceCheckout\Sdk\ApiClient;
-use PostFinanceCheckout\Sdk\Model\{TransactionInvoiceState, TransactionState};
+use PostFinanceCheckout\Sdk\Model\{Transaction, TransactionState};
 
 /**
  * Class PostFinanceCheckoutWebhookManager
@@ -22,6 +22,11 @@ use PostFinanceCheckout\Sdk\Model\{TransactionInvoiceState, TransactionState};
  */
 class PostFinanceCheckoutWebhookManager
 {
+    private const AUTHORIZED_STATES = [
+        TransactionState::AUTHORIZED,
+        TransactionState::FULFILL,
+    ];
+
     /**
      * @var array $data
      */
@@ -89,9 +94,11 @@ class PostFinanceCheckoutWebhookManager
             case PostFinanceCheckoutHelper::TRANSACTION:
                 $orderUpdater->updateOrderStatus($entityId);
                 $transactionStateFromWebhook = $this?->data['state'] ?? null;
-                if ($transactionStateFromWebhook === TransactionState::AUTHORIZED) {
-                    $transaction = $this->transactionService->getTransactionFromPortal($entityId);
-                    $orderId = (int)$transaction->getMetaData()['orderId'];
+
+                $transaction = $this->transactionService->getTransactionFromPortal($entityId);
+                $orderId = (int)$transaction->getMetaData()['orderId'] ?? null;
+
+                if ($this->shouldSendAuthorizationEmail($transactionStateFromWebhook, $transaction, $orderId)) {
                     $this->transactionService->sendEmail($orderId, 'authorization');
                 }
                 break;
@@ -112,5 +119,27 @@ class PostFinanceCheckoutWebhookManager
                 break;
         }
     }
+
+    /**
+     * Determines if the authorization email should be sent based on webhook state and transaction state.
+     *
+     * @param string|null $webhookState The state from webhook payload, or null if payload validation is disabled.
+     * @param Transaction $transaction The transaction object.
+     * @param int|null $orderId The associated order ID.
+     * @return bool True if email should be sent, otherwise false.
+     */
+    private function shouldSendAuthorizationEmail(?string $webhookState, Transaction $transaction, ?int $orderId): bool
+    {
+        if ($orderId === null) {
+            return false;
+        }
+
+        if ($webhookState === null) {
+            return in_array($transaction->getState(), self::AUTHORIZED_STATES, true);
+        }
+
+        return $webhookState === TransactionState::AUTHORIZED;
+    }
+
 }
 

@@ -76,29 +76,6 @@ class PostFinanceCheckoutMailService {
     }
 
     /**
-     * Checks if the email specified by the template has been sent for the given order.
-     *
-     * @param int $orderId
-     *     The ID of the order.
-     * @param string $template
-     *     The template to use. Currently only 'authorization' and 'fulfill' values are supported.
-     *
-     * @return bool True if the email has been sent for this template, false otherwise.
-     */
-    public function isEmailSent(int $orderId, string $template): bool {
-
-        $this->validateTemplate($template);
-        $column_name = "{$template}_email_sent";
-
-        $result = $this->db->select(
-            'postfinancecheckout_transactions',
-            'order_id',
-            $orderId
-        );
-        return !empty($result) && $result->$column_name == 1;
-    }
-
-    /**
      * Sends an email for the specified order.
      *
      * @param int $orderId The ID of the order.
@@ -107,37 +84,10 @@ class PostFinanceCheckoutMailService {
     public function sendMail(int $orderId, string $template): void {
         try {
             $data = $this->prepareData($orderId);
-            if ($this->canSendEmail($data, $template)) {
-                $this->send($data, $template);
-                $this->updateDatabase($orderId, $template);
-            }
+            $this->send($data, $template);
         } catch (\Exception $e) {
-            // Handle errors (logging, retries, etc.)
             error_log("Error sending mail for template : " . $template . " : " . $e->getMessage());
         }
-    }
-
-    /**
-     * Updates the database for the specified order and template.
-     *
-     * @param int $orderId The ID of the order.
-     * @param string $template
-     *     The template to use. Currently only 'authorization' and 'fulfill' values are supported.
-     * @return void
-     */
-    protected function updateDatabase(int $orderId, string $template): void {
-        $this->validateTemplate($template);
-        $column_name = "{$template}_email_sent";
-
-        $this->db->update(
-            'postfinancecheckout_transactions',
-            ['order_id'],
-            [$orderId],
-            (object)[
-                $column_name => 1,
-                'updated_at' => date('Y-m-d H:i:s'),
-            ]
-        );
     }
 
     /**
@@ -176,8 +126,10 @@ class PostFinanceCheckoutMailService {
      * @return void
      */
     protected function send(\stdClass $data, string $template): void {
-        $this->validateTemplate($template);
-        $this->mailer->send($this->mail->createFromTemplateID($this->emailTemplates[$template], $data));
+        if ($this->canSendEmail($data, $template)) {
+            $this->validateTemplate($template);
+            $this->mailer->send($this->mail->createFromTemplateID($this->emailTemplates[$template], $data));
+        }
     }
 
     /**

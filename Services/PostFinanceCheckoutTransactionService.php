@@ -835,9 +835,63 @@ class PostFinanceCheckoutTransactionService
      * @param string $template
      *     The template to use. Currently only 'authorization' and 'fulfill' values are supported.
      */
-    public function sendEmail(int $orderId, string $template) {
-        if (!$this->mailService->isEmailSent($orderId, $template)) {
+    public function sendEmail(int $orderId, string $template): void {
+        if ($this->markEmailAsSentIfNotAlreadyMarked($orderId, $template)) {
             $this->mailService->sendMail($orderId, $template);
+        }
+    }
+
+    /**
+     * @param int $orderId
+     * @param string $template
+     * @return bool
+     */
+    public function markEmailAsSentIfNotAlreadyMarked(int $orderId, string $template): bool
+    {
+        $log = Shop::Container()->getLogService();
+        $db = Shop::Container()->getDB();
+        $column = "{$template}_email_sent";
+
+        try {
+            $db->executeQuery('START TRANSACTION');
+
+            $status = $db->select(
+                'postfinancecheckout_transactions',
+                'order_id',
+                $orderId
+            );
+
+            $emailAlreadySent = !empty($status) && (int)($status->$column ?? 0) === 1;
+
+            if ($emailAlreadySent) {
+                $db->executeQuery('ROLLBACK');
+                return false;
+            }
+
+            $updateData = (object)[
+                $column => 1,
+                'updated_at' => date('Y-m-d H:i:s')
+            ];
+
+            $db->update(
+                'postfinancecheckout_transactions',
+                'order_id',
+                $orderId,
+                $updateData
+            );
+
+            $db->executeQuery('COMMIT');
+
+            return true;
+        } catch (\Throwable $e) {
+            $db->executeQuery('ROLLBACK');
+            $log->error('markEmailAsSentIfNotAlreadyMarked ERROR', [
+                'orderId' => $orderId,
+                'template' => $template,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return false;
         }
     }
 
