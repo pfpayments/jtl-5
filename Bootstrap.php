@@ -215,6 +215,24 @@ class Bootstrap extends Bootstrapper
         $dispatcher->listen('shop.hook.' . \HOOK_BESTELLUNGEN_XML_BEARBEITESTORNO, function ($args) use ($handler) {
             $handler->cancelOrderAfterWawi($args);
         });
+
+        $dispatcher->listen('shop.hook.' . \HOOK_BESTELLABSCHLUSS_PAGE_ZAHLUNGSVORGANG, function ($args) {
+            $smarty = $args['smarty'] ?? \JTL\Shop::Smarty();
+            $bestellung = $args['oBestellung'] ?? $smarty->getTemplateVars('Bestellung');
+            $shipping = $bestellung->oVersandart ?? null;
+
+            if ($shipping && isset($shipping->country) && $shipping->country !== null) {
+                $smarty->assign('FavourableShipping', $shipping);
+            } else {
+                $dummyCountry = new \JTL\Country\Country('--');
+                foreach (\JTL\Shop::Lang()->getAllLanguages() as $lang) {
+                    $dummyCountry->setName($lang, '');
+                }
+                $dummyShipping = new \stdClass();
+                $dummyShipping->country = $dummyCountry;
+                $smarty->assign('FavourableShipping', $dummyShipping);
+            }
+        });
     }
 
     /**
