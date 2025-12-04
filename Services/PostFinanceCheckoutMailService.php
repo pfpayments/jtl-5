@@ -98,17 +98,61 @@ class PostFinanceCheckoutMailService {
      */
     protected function prepareData(int $orderId): \stdClass {
         $order  = (new Bestellung($orderId, false, $this->db))->fuelleBestellung(false);
-        $orderHandler = new OrderHandler(Shop::Container()->getDB(), Frontend::getCustomer(), Frontend::getCart());
         $helper = new Order($order);
         $amount = $helper->getTotal(4);
 
         $customer = new Customer($order->kKunde, null, $this->db);
+
+        // ------------------------------
+        // REAL availability detection
+        // ------------------------------
+        $availability = [
+            'cArtikelName_arr' => [],
+            'cHinweis'         => '',
+        ];
+
+        foreach ($order->Positionen as $pos) {
+
+            if ($pos->nPosTyp != \C_WARENKORBPOS_TYP_ARTIKEL) {
+                continue;
+            }
+
+            $art = $pos->Artikel ?? null;
+            if (!$art) {
+                continue;
+            }
+
+            // Stock must be observed
+            if ((strtoupper($art->cLagerBeachten) ?? 'N') !== 'Y') {
+                continue;
+            }
+
+            // If qty > stock → mark as unavailable
+            if ($pos->nAnzahl > ($art->fLagerbestand ?? 0)) {
+                $availability['cArtikelName_arr'][] = $art->cName;
+            }
+        }
+
+        if (!empty($availability['cArtikelName_arr'])) {
+            $availability['cHinweis'] = Shop::Lang()->get('orderExpandInventory', 'basket');
+        }
+
+        // Safety
+        if (!is_array($availability['cArtikelName_arr'])) {
+            $availability['cArtikelName_arr'] = [];
+        }
+        if (!is_string($availability['cHinweis'])) {
+            $availability['cHinweis'] = '';
+        }
+
+        // ------------------------------
+
         $data = new \stdClass();
-        $data->cVerfuegbarkeit_arr = $orderHandler->checkAvailability();
-        $data->tkunde = $customer;
-        $data->tbestellung = $order;
-        $data->payments       = $order->getIncommingPayments(false);
-        $data->totalLocalized = Preise::getLocalizedPriceWithoutFactor(
+        $data->cVerfuegbarkeit_arr = $availability;
+        $data->tkunde              = $customer;
+        $data->tbestellung         = $order;
+        $data->payments            = $order->getIncommingPayments(false);
+        $data->totalLocalized      = Preise::getLocalizedPriceWithoutFactor(
             $amount->total[CartHelper::GROSS],
             $amount->currency,
             false

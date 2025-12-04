@@ -21,6 +21,7 @@ class PostFinanceCheckoutApiClient
 	const SHOP_SYSTEM = 'x-meta-shop-system';
 	const SHOP_SYSTEM_VERSION = 'x-meta-shop-system-version';
 	const SHOP_SYSTEM_AND_VERSION = 'x-meta-shop-system-and-version';
+	const PLUGIN_VERSION   = 'x-meta-plugin-version';
 	
 	public function __construct(int $pluginId)
 	{
@@ -75,6 +76,7 @@ class PostFinanceCheckoutApiClient
 		  self::SHOP_SYSTEM => 'jtl',
 		  self::SHOP_SYSTEM_VERSION => $shop_version,
 		  self::SHOP_SYSTEM_AND_VERSION => 'jtl-' . $major_version . '.' . $minor_version,
+		  self::PLUGIN_VERSION => '1.0.41',
 		];
 	}
 	
