@@ -52,7 +52,7 @@ class Bootstrap extends Bootstrapper
         parent::boot($dispatcher);
         $plugin = $this->getPlugin();
 
-        if (Shop::isFrontend()) {
+        if (Shop::isFrontend() && php_sapi_name() !== 'cli') {
             $apiClient = PostFinanceCheckoutHelper::getApiClient($plugin->getId());
             if (empty($apiClient)) {
                 // Need to run composer install

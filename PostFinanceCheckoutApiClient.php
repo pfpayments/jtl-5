@@ -76,7 +76,7 @@ class PostFinanceCheckoutApiClient
 		  self::SHOP_SYSTEM => 'jtl',
 		  self::SHOP_SYSTEM_VERSION => $shop_version,
 		  self::SHOP_SYSTEM_AND_VERSION => 'jtl-' . $major_version . '.' . $minor_version,
-		  self::PLUGIN_VERSION => '1.0.41',
+		  self::PLUGIN_VERSION => '1.0.42',
 		];
 	}
 	
