@@ -7,13 +7,13 @@ namespace Plugin\jtl_postfinancecheckout\Services;
 use JTL\Cart\CartHelper;
 use JTL\Catalog\Product\Preise;
 use JTL\Checkout\Bestellung;
-use JTL\Checkout\OrderHandler;
 use JTL\Customer\Customer;
 use JTL\DB\DbInterface;
 use JTL\Helpers\Order;
 use JTL\Mail\Mail\Mail;
 use JTL\Mail\Mailer;
-use JTL\Session\Frontend;
+use JTL\Settings\Option\Globals;
+use JTL\Settings\Settings;
 use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 
@@ -103,49 +103,47 @@ class PostFinanceCheckoutMailService {
 
         $customer = new Customer($order->kKunde, null, $this->db);
 
-        // ------------------------------
-        // REAL availability detection
-        // ------------------------------
         $availability = [
             'cArtikelName_arr' => [],
             'cHinweis'         => '',
         ];
 
-        foreach ($order->Positionen as $pos) {
+        if (Settings::boolValue(Globals::DELAY_SHOW)) {
+            foreach ($order->Positionen as $pos) {
+                if ($pos->nPosTyp !== \C_WARENKORBPOS_TYP_ARTIKEL) {
+                    continue;
+                }
 
-            if ($pos->nPosTyp != \C_WARENKORBPOS_TYP_ARTIKEL) {
-                continue;
-            }
+                $article = $pos->Artikel ?? null;
+                if ($article === null) {
+                    continue;
+                }
 
-            $art = $pos->Artikel ?? null;
-            if (!$art) {
-                continue;
-            }
+                $observeStock   = strtoupper((string)($article->cLagerBeachten ?? 'N')) === 'Y';
+                $allowBackorder = strtoupper((string)($article->cLagerKleinerNull ?? 'N')) === 'Y';
+                if (!$observeStock || !$allowBackorder) {
+                    continue;
+                }
 
-            // Stock must be observed
-            if ((strtoupper($art->cLagerBeachten) ?? 'N') !== 'Y') {
-                continue;
-            }
+                // Keep availability tied to checkout moment, not current catalog stock.
+                $stockBeforeCheckout = $pos->fLagerbestandVorAbschluss ?? null;
+                if ($stockBeforeCheckout === null) {
+                    continue;
+                }
 
-            // If qty > stock → mark as unavailable
-            if ($pos->nAnzahl > ($art->fLagerbestand ?? 0)) {
-                $availability['cArtikelName_arr'][] = $art->cName;
+                if ((float)$pos->nAnzahl > (float)$stockBeforeCheckout) {
+                    $availability['cArtikelName_arr'][] = (string)$article->cName;
+                }
             }
         }
 
         if (!empty($availability['cArtikelName_arr'])) {
-            $availability['cHinweis'] = Shop::Lang()->get('orderExpandInventory', 'basket');
+            $availability['cHinweis'] = str_replace(
+                '%s',
+                '',
+                Shop::Lang()->get('orderExpandInventory', 'basket')
+            );
         }
-
-        // Safety
-        if (!is_array($availability['cArtikelName_arr'])) {
-            $availability['cArtikelName_arr'] = [];
-        }
-        if (!is_string($availability['cHinweis'])) {
-            $availability['cHinweis'] = '';
-        }
-
-        // ------------------------------
 
         $data = new \stdClass();
         $data->cVerfuegbarkeit_arr = $availability;
