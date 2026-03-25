@@ -11,7 +11,7 @@
             "version": "4.8.1",
             "source": {
                 "type": "git",
-                "url": "https://github.com/pfpayments/php-sdk.git",
+                "url": "git@github.com:pfpayments/php-sdk.git",
                 "reference": "d331edcb55176939bc6364035a5310984df0ed4a"
             },
             "dist": {
@@ -58,9 +58,6 @@
                 "postfinancecheckout",
                 "sdk"
             ],
-            "support": {
-                "source": "https://github.com/pfpayments/php-sdk/tree/4.8.1"
-            },
             "time": "2025-10-29T13:59:08+00:00"
         }
     ],
