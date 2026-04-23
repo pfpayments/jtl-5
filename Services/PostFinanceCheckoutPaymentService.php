@@ -113,6 +113,17 @@ class PostFinanceCheckoutPaymentService
 		  ->select(self::TABLE_NAME_PAYMENT_METHODS, 'cModulId', $slug);
 
 		if ($paymentMethod) {
+			// Ensure ZAHLUNGSART_MAIL_EINGANG (0x0001) is always set so that
+			// the order confirmation email is sent after a successful payment.
+			// JTL's admin backend or installer can reset nMailSenden to 16
+			// (ZAHLUNGSART_MAIL_STORNO only), which prevents email delivery.
+			if (!((int)$paymentMethod->nMailSenden & 0x0001)) {
+				$upd = new \stdClass();
+				$upd->nMailSenden = (int)$paymentMethod->nMailSenden | 0x0001;
+				Shop::Container()
+				  ->getDB()
+				  ->update(self::TABLE_NAME_PAYMENT_METHODS, 'cModulId', $slug, $upd);
+			}
 			return null;
 		}
 
