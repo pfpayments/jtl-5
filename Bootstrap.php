@@ -200,10 +200,15 @@ class Bootstrap extends Bootstrapper
                 $paymentMethodEntity = new Zahlungsart($order->kZahlungsart);
 
                 if ($order->cStatus != \BESTELLUNG_STATUS_VERSANDT && $paymentMethodEntity->cAnbieter === 'PostFinanceCheckout') {
+                    PostFinanceCheckoutHelper::log("HOOK_BESTELLUNGEN_XML_BEARBEITESET: Triggered for Order $orderId. Setting status to Paid.");
                     $moduleId = $paymentMethodEntity->cModulId ?? '';
                     $paymentMethod = new Method($moduleId);
+                    // We keep setOrderStatusToPaid to ensure the order transitions to 'Bezahlt' (status 3) 
+                    // after Wawi sync, instead of staying at 'In Bearbeitung' (status 2).
                     $paymentMethod->setOrderStatusToPaid($order);
-                    $transactionService->updateWawiSyncFlag($orderId, $transactionService::NOT_SYNC_TO_WAWI);
+                    // We intentionally do NOT call updateWawiSyncFlag here anymore. 
+                    // The original code was prematurely marking orders as 'synced' before the XML transfer 
+                    // completed, causing intermittent order loss during Wawi synchronization.
                 }
             }
         });

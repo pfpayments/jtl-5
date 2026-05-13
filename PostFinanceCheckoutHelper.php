@@ -256,5 +256,16 @@ class PostFinanceCheckoutHelper extends Helper
         $config = self::getConfigByID($pluginId);
         return $config[self::INTEGRATION_TYPE] ?? 'payment_page';
     }
+
+    /**
+     * @param string $message
+     * @return void
+     */
+    public static function log(string $message): void
+    {
+        $logFile = \PFAD_ROOT . 'templates_c/postfinancecheckout_debug.log';
+        $timestamp = date('Y-m-d H:i:s');
+        \file_put_contents($logFile, "[$timestamp] $message" . \PHP_EOL, \FILE_APPEND);
+    }
 }
 

@@ -10,6 +10,7 @@ use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 /** @global JTL\Plugin\PluginInterface $plugin */
 
 $transactionId = $_SESSION['transactionId'] ?? null;
+PostFinanceCheckoutHelper::log("failed_payment: User landed on failure page. TransactionId: " . ($transactionId ?? 'NONE'));
 $translations = PostFinanceCheckoutHelper::getTranslations($plugin->getLocalization(), [
     'jtl_postfinancecheckout_payment_not_available_by_country_or_currency',
 ], false);
@@ -28,35 +29,39 @@ if ($transactionId) {
     if (str_contains(strtolower($errorMessage), 'timeout')) {
         unset($_SESSION['arrayOfPossibleMethods']);
     }
-}
 
-if (!function_exists('restoreCart')) {
-    function restoreCart($cartItems)
-    {
-        foreach ($cartItems as $cartItem) {
-            if ($cartItem->kArtikel === 0) {
-                continue;
-            }
-
-            $quantityBefore = (int)$cartItem->fLagerbestandVorAbschluss;
-            if ($quantityBefore < 1) {
-                continue;
-            }
-
-            Shop::Container()->getDB()->update(
-                'tartikel',
-                'kArtikel',
-                (int)$cartItem->kArtikel,
-                (object)['fLagerbestand' => $quantityBefore]
-            );
-        }
+    $orderId = (int)($transaction->getMetaData()['orderId'] ?? 0);
+    if ($orderId === 0) {
+        $localTransaction = $transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
+        $orderId = (int)($localTransaction->order_id ?? 0);
     }
-}
 
-if (isset($_SESSION['orderData']) && !empty($_SESSION['orderData']->Positionen)) {
-    $cartItems = $_SESSION['orderData']->Positionen;
-    if ($cartItems) {
-        restoreCart($cartItems);
+    if ($orderId > 0) {
+        // Native JTL cancellation. 
+        // This triggers the standard 'Storno' routine which releases stock reservations 
+        // correctly and updates the order status to 'Cancelled'. 
+        // We use this instead of manual stock updates to ensure data integrity.
+        $order = new \JTL\Checkout\Bestellung($orderId);
+        if (!empty($order->kZahlungsart)) {
+            $paymentMethodEntity = new \JTL\Checkout\Zahlungsart((int)$order->kZahlungsart);
+            $paymentMethod = new \JTL\Plugin\Payment\Method($paymentMethodEntity->cModulId);
+            
+            PostFinanceCheckoutHelper::log("failed_payment: Cancelling Order $orderId via native cancelOrder routine.");
+            $paymentMethod->cancelOrder($orderId);
+
+            // Since JTL's native cancelOrder doesn't release stock, we handle it manually but safely.
+            // We use an additive UPDATE to avoid race conditions with other orders.
+            $order->fuelleBestellung(false);
+            foreach ($order->Positionen as $pos) {
+                if ((int)$pos->nPosTyp === \C_WARENKORBPOS_TYP_ARTIKEL && (int)$pos->kArtikel > 0) {
+                    PostFinanceCheckoutHelper::log("failed_payment: Restoring stock for Product $pos->kArtikel (Qty: $pos->nAnzahl)");
+                    Shop::Container()->getDB()->queryPrepared(
+                        "UPDATE tartikel SET fLagerbestand = fLagerbestand + :qty WHERE kArtikel = :id",
+                        ['qty' => (float)$pos->nAnzahl, 'id' => (int)$pos->kArtikel]
+                    );
+                }
+            }
+        }
     }
 }
 

@@ -4,6 +4,8 @@ use JTL\Checkout\Bestellung;
 use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutApiClient;
+use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
+use PostFinanceCheckout\Sdk\Model\TransactionState;
 
 /** @global \JTL\Smarty\JTLSmarty $smarty */
 /** @global JTL\Plugin\PluginInterface $plugin */
@@ -30,6 +32,18 @@ if ($transactionId) {
         $localTransaction = $transactionService->getLocalPostFinanceCheckoutTransactionById((string)$transactionId);
         $orderId = (int) $localTransaction->order_id;
     }
+
+    if ($orderId > 0) {
+        $state = $transaction->getState();
+        // Fallback for JTL-Wawi synchronization. 
+        // If the transaction is already authorized or fulfilled in the portal, we ensure the sync flag 
+        // is set to 'N' (LET_SYNC_TO_WAWI) immediately. This prevents the order from being hidden from 
+        // Wawi if the asynchronous webhook is delayed or fails.
+        if ($state === TransactionState::FULFILL || $state === TransactionState::AUTHORIZED) {
+            PostFinanceCheckoutHelper::log("thank_you_page: Transaction $transactionId is successful ($state). Resetting cAbgeholt to LET_SYNC_TO_WAWI ('N').");
+            $transactionService->updateWawiSyncFlag($orderId, $transactionService::LET_SYNC_TO_WAWI);
+        }
+    }
 } else {
     Shop::Container()->getLogService()->notice(
         "No transaction ID."
@@ -43,7 +57,7 @@ $_SESSION['arrayOfPossibleMethods'] = null;
 
 $linkHelper = Shop::Container()->getLinkService();
 if ($orderId > 0) {
-    $bestellid = $this->db->select('tbestellid', 'kBestellung', $orderId);
+    $bestellid = Shop::Container()->getDB()->select('tbestellid', 'kBestellung', $orderId);
 }
 $controlId = $bestellid->cId ?? '';
 $url = $linkHelper->getStaticRoute('bestellabschluss.php') . '?i=' . $controlId;

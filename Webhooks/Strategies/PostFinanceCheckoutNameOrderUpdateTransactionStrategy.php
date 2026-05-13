@@ -59,6 +59,7 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
             exit;
         }
 
+        PostFinanceCheckoutHelper::log("webhook strategy: Processing transaction $transactionId with state $transactionState for order $orderId");
         switch ($transactionState) {
             case TransactionState::FULFILL:
                 $order = new Bestellung($orderId);
@@ -79,22 +80,15 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
                 break;
 
             case TransactionState::FAILED:
-                // Deleted the order from the shop, because transaction failed and order will never be finished.
-                // New transaction will be created with new order.
-                Shop::Container()->getDB()->delete('tbestellung', 'kBestellung', $orderId);
-                break;
-
             case TransactionState::DECLINE:
             case TransactionState::VOIDED:
+                PostFinanceCheckoutHelper::log("webhook strategy: Transaction $transactionId in state $transactionState. Cancelling order $orderId.");
                 $order = new Bestellung($orderId);
-                $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                $moduleId = $paymentMethodEntity->cModulId ?? '';
-                $paymentMethod = new Method($moduleId);
-                $paymentMethod->cancelOrder($orderId);
-
-                // If transaction was cancelled from portal - we delete leftovers from the shop
-                if ($order && (int )$order->cStatus === \BESTELLUNG_STATUS_OFFEN) {
-                    Shop::Container()->getDB()->delete('tbestellung', 'kBestellung', $orderId);
+                if (!empty($order->kZahlungsart)) {
+                    $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+                    $moduleId = $paymentMethodEntity->cModulId ?? '';
+                    $paymentMethod = new Method($moduleId);
+                    $paymentMethod->cancelOrder($orderId);
                 }
                 print 'Order ' . $orderId . ' status was updated to cancelled';
                 break;
