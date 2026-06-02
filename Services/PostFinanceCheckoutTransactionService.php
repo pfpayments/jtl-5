@@ -16,6 +16,7 @@ use JTL\Shop;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 use stdClass;
 use PostFinanceCheckout\Sdk\ApiClient;
+use PostFinanceCheckout\Sdk\ApiException;
 use PostFinanceCheckout\Sdk\Model\{AddressCreate,
   CreationEntityState,
   CriteriaOperator,
@@ -213,11 +214,70 @@ class PostFinanceCheckoutTransactionService
             }
         }
 
-        $this->apiClient->getTransactionService()
-            ->confirm($this->spaceId, $pendingTransaction);
+        try {
+            $this->apiClient->getTransactionService()
+                ->confirm($this->spaceId, $pendingTransaction);
+        } catch (ApiException $e) {
+            // The JTL order and the local transaction record were created above
+            // before the API call. If confirm fails (e.g. HTTP 442 from server-side
+            // address validation), the customer never reaches the payment page and
+            // no webhook will ever flip the order out of NOT_SYNC_TO_WAWI — leaving
+            // the order stranded. Cancel it explicitly so stock is restored and the
+            // order is removed via the native payment-method flow.
+            PostFinanceCheckoutHelper::log(
+                'confirmTransaction: confirm() failed for transaction ' . $transactionId
+                . ' (HTTP ' . $e->getCode() . '): ' . $e->getMessage()
+                . '. Rolling back order ' . ($orderId ?? 'n/a') . '.'
+            );
+            if ($createOrderAfterPayment === 1 && !empty($orderId)) {
+                $this->cancelOrderAfterConfirmFailure((int)$orderId);
+                // The user is redirected to the fail-page next, which runs the
+                // same cancelOrder + additive stock restore routine. Signal it
+                // to skip cleanup for this order so stock isn't restored twice.
+                $_SESSION['pfcn_rollback_done_order_id'] = (int)$orderId;
+            }
+            $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId, TransactionState::FAILED);
+            throw $e;
+        }
 
         if ($createOrderAfterPayment === 1) {
             $this->updateLocalPostFinanceCheckoutTransaction((string)$transactionId);
+        }
+    }
+
+    /**
+     * Cancel a JTL order that was created during confirmTransaction but whose
+     * matching Wallee transaction never reached the CONFIRMED state. Mirrors the
+     * failed_payment.php recovery path: native cancelOrder for the Storno
+     * routine, then a manual additive stock restore (native cancelOrder does
+     * not release stock).
+     */
+    private function cancelOrderAfterConfirmFailure(int $orderId): void
+    {
+        try {
+            $order = new Bestellung($orderId);
+            if (empty($order->kZahlungsart)) {
+                return;
+            }
+
+            $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+            $paymentMethod = new Method($paymentMethodEntity->cModulId ?? '');
+            $paymentMethod->cancelOrder($orderId);
+
+            $order->fuelleBestellung(false);
+            foreach ($order->Positionen as $pos) {
+                if ((int)$pos->nPosTyp === \C_WARENKORBPOS_TYP_ARTIKEL && (int)$pos->kArtikel > 0) {
+                    Shop::Container()->getDB()->queryPrepared(
+                        'UPDATE tartikel SET fLagerbestand = fLagerbestand + :qty WHERE kArtikel = :id',
+                        ['qty' => (float)$pos->nAnzahl, 'id' => (int)$pos->kArtikel]
+                    );
+                }
+            }
+        } catch (\Throwable $t) {
+            PostFinanceCheckoutHelper::log(
+                'cancelOrderAfterConfirmFailure: failed to cancel order ' . $orderId
+                . ': ' . $t->getMessage()
+            );
         }
     }
 
@@ -712,6 +772,32 @@ class PostFinanceCheckoutTransactionService
     }
 
     /**
+     * Strip non-printable control characters (keeping line breaks) and truncate
+     * to the SDK / Wallee API limit. Required because the API rejects with 442
+     * "The street can contain only printable characters including line breaks."
+     * and the SDK throws InvalidArgumentException when length is exceeded —
+     * e.g. for Asian addresses where mb_strlen counts characters and city
+     * fields can hold extra locality info pushing past 100 chars.
+     */
+    private function sanitizeAddressField(?string $value, int $maxLength): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+        $clean = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $value);
+        if ($clean === null) {
+            // preg_replace returns null on UTF-8 decode failure; fall back to
+            // a byte-level strip so a malformed byte sequence cannot block payment.
+            $clean = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $value) ?? '';
+        }
+        $clean = trim($clean);
+        if (mb_strlen($clean, 'UTF-8') > $maxLength) {
+            $clean = mb_substr($clean, 0, $maxLength, 'UTF-8');
+        }
+        return $clean;
+    }
+
+    /**
      * @return AddressCreate
      */
     private function createBillingAddress(): AddressCreate
@@ -722,30 +808,30 @@ class PostFinanceCheckoutTransactionService
         }
 
         $billingAddress = new AddressCreate();
-        $billingAddress->setStreet($customer->cStrasse . ' ' . $customer->cHausnummer);
-        $billingAddress->setCity($customer->cOrt);
+        $billingAddress->setStreet($this->sanitizeAddressField(($customer->cStrasse ?? '') . ' ' . ($customer->cHausnummer ?? ''), 300));
+        $billingAddress->setCity($this->sanitizeAddressField($customer->cOrt ?? null, 100));
         $billingAddress->setCountry($customer->cLand);
-        $billingAddress->setEmailAddress($customer->cMail);
-        $billingAddress->setFamilyName($customer->cNachname);
-        $billingAddress->setGivenName($customer->cVorname);
-        $billingAddress->setPostCode($customer->cPLZ);
-        $billingAddress->setPostalState($customer->cLand ?? $customer->cBundesland);
-        $billingAddress->setOrganizationName($customer->cFirma);
-        $billingAddress->setPhoneNumber($customer->cMobil);
+        $billingAddress->setEmailAddress($this->sanitizeAddressField($customer->cMail ?? null, 254));
+        $billingAddress->setFamilyName($this->sanitizeAddressField($customer->cNachname ?? null, 100));
+        $billingAddress->setGivenName($this->sanitizeAddressField($customer->cVorname ?? null, 100));
+        $billingAddress->setPostCode($this->sanitizeAddressField($customer->cPLZ ?? null, 40));
+        $billingAddress->setPostalState($this->sanitizeAddressField($customer->cLand ?? $customer->cBundesland ?? null, 100));
+        $billingAddress->setOrganizationName($this->sanitizeAddressField($customer->cFirma ?? null, 100));
+        $billingAddress->setPhoneNumber($this->sanitizeAddressField($customer->cMobil ?? null, 100));
 
         $company = $customer->cFirma ?? null;
         if ($company) {
-            $billingAddress->setOrganizationName($company);
+            $billingAddress->setOrganizationName($this->sanitizeAddressField($company, 100));
         }
 
         $mobile = $customer->cMobil ?? null;
         if ($mobile) {
-            $billingAddress->setMobilePhoneNumber($mobile);
+            $billingAddress->setMobilePhoneNumber($this->sanitizeAddressField($mobile, 100));
         }
 
         $phone = $customer->cTel ?? $mobile;
         if ($phone) {
-            $billingAddress->setPhoneNumber($phone);
+            $billingAddress->setPhoneNumber($this->sanitizeAddressField($phone, 100));
         }
 
         $birthDate = $customer->dGeburtstag_formatted ?? null;
@@ -780,17 +866,17 @@ class PostFinanceCheckoutTransactionService
         }
 
         $shippingAddress = new AddressCreate();
-        $shippingAddress->setStreet($customer->cStrasse . ' ' . $customer->cHausnummer);
-        $shippingAddress->setCity($customer->cOrt);
+        $shippingAddress->setStreet($this->sanitizeAddressField(($customer->cStrasse ?? '') . ' ' . ($customer->cHausnummer ?? ''), 300));
+        $shippingAddress->setCity($this->sanitizeAddressField($customer->cOrt ?? null, 100));
         $shippingAddress->setCountry($customer->cLand);
-        $shippingAddress->setEmailAddress($customer->cMail);
-        $shippingAddress->setFamilyName($customer->cNachname);
-        $shippingAddress->setGivenName($customer->cVorname);
-        $shippingAddress->setPostCode($customer->cPLZ);
-        $shippingAddress->setPostalState($customer->cLand ?? $customer->cBundesland);
-        $shippingAddress->setOrganizationName($customer->cFirma);
-        $shippingAddress->setPhoneNumber($customer->cMobil);
-        $shippingAddress->setSalutation($customer->cTitel);
+        $shippingAddress->setEmailAddress($this->sanitizeAddressField($customer->cMail ?? null, 254));
+        $shippingAddress->setFamilyName($this->sanitizeAddressField($customer->cNachname ?? null, 100));
+        $shippingAddress->setGivenName($this->sanitizeAddressField($customer->cVorname ?? null, 100));
+        $shippingAddress->setPostCode($this->sanitizeAddressField($customer->cPLZ ?? null, 40));
+        $shippingAddress->setPostalState($this->sanitizeAddressField($customer->cLand ?? $customer->cBundesland ?? null, 100));
+        $shippingAddress->setOrganizationName($this->sanitizeAddressField($customer->cFirma ?? null, 100));
+        $shippingAddress->setPhoneNumber($this->sanitizeAddressField($customer->cMobil ?? null, 100));
+        $shippingAddress->setSalutation($this->sanitizeAddressField($customer->cTitel ?? null, 20));
 
         $gender = $_SESSION['orderData']?->Lieferadresse?->cAnrede ?? '';
         if (empty($gender)) {

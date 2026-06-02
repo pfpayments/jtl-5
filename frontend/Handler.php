@@ -11,6 +11,7 @@ use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutRefundService;
 use Plugin\jtl_postfinancecheckout\Services\PostFinanceCheckoutTransactionService;
 use Plugin\jtl_postfinancecheckout\PostFinanceCheckoutHelper;
 use PostFinanceCheckout\Sdk\ApiClient;
+use PostFinanceCheckout\Sdk\ApiException;
 use PostFinanceCheckout\Sdk\Model\TransactionState;
 
 final class Handler
@@ -273,7 +274,18 @@ final class Handler
         $_SESSION['possiblePaymentMethodName'] = $paymentMethod->getName();
         $_SESSION['orderData'] = $orderData;
 
-        $this->confirmTransaction($spaceId, $createdTransactionId);
+        try {
+            $this->confirmTransaction($spaceId, $createdTransactionId);
+        } catch (ApiException $e) {
+            // The service already cancelled the JTL order it had just created.
+            // Redirect to the standard fail page so the user sees a sensible
+            // error instead of an unhandled exception.
+            PostFinanceCheckoutHelper::log(
+                'getRedirectUrlAfterCreatedTransaction: confirm failed (HTTP '
+                . $e->getCode() . '): ' . $e->getMessage()
+            );
+            return Shop::getURL() . '/' . PostFinanceCheckoutHelper::PLUGIN_CUSTOM_PAGES['fail-page'][$_SESSION['cISOSprache']];
+        }
 
 		$integration = PostFinanceCheckoutHelper::getIntegrationType($this->plugin->getId());
 		if ($integration === PostFinanceCheckoutHelper::INTEGRATION_TYPE_PAYMENT_PAGE) {
