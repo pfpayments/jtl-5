@@ -38,7 +38,7 @@ class AdminTabProvider
         'FULFILL',
         'PAID',
         'REFUNDED',
-        'PARTIALY_REFUNDED'
+        'PARTIALLY REFUNDED'
     ];
 
     /**

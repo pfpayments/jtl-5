@@ -1,14 +1,14 @@
 
 
-PostFinance Checkout integration for JTL 5.5 and 5.6
+PostFinance Checkout integration for JTL 5.5, 5.6 and 5.7
 =============================
 
 The PostFinance Checkout plugin wraps around the PostFinance Checkout API. This library facilitates your interaction with various services such as transactions.
 
 ## Requirements
 
-- PHP 8.1
-- JTL 5.5.x, 5.6.x
+- PHP minimum version supported by the each shop version.
+- JTL 5.5.x, 5.6.x, 5.7.x. See table below.
 
 ## Installation
 
@@ -36,7 +36,15 @@ account dashboard.
 
 ## Documentation
 
-[Documentation](https://plugin-documentation.postfinance-checkout.ch/pfpayments/jtl-5/1.0.46/docs/en/documentation.html)
+[Documentation](https://plugin-documentation.postfinance-checkout.ch/pfpayments/jtl-5/1.0.47/docs/en/documentation.html)
+
+## Compatibility
+
+___________________________________________________________________________________
+| JTL 5 version                 | Plugin major version   | Supported until        |
+|-------------------------------|------------------------|------------------------|
+| 5.5.x, 5.6.x, 5.7.x           | 1.x                    | Further notice         |
+-----------------------------------------------------------------------------------
 
 ## License
 
