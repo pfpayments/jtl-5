@@ -23,7 +23,7 @@
 		</a>
 	</li>
 	<li>
-		<a href="https://github.com/pfpayments/jtl-5/releases/tag/1.0.47/">
+		<a href="https://github.com/pfpayments/jtl-5/releases/tag/1.0.48/">
 			Source
 		</a>
 	</li>
@@ -347,16 +347,51 @@ Tokenization is not available for guest checkouts.
 <p>The extension uses the JTL5 logging functions which are automatically active in your JTL5 store.
 The extension will log various unexpected errors or information which can help identify the cause of the error. You can find the logs on the server of your store in the var/log/ folder.</p>
 </div>					</div>
+</div>	<div class="chapter" id="_gdpr">
+	<div class="chapter-title">
+		<h1>
+			<span class="title-number">8</span>GDPR					</h1>
+	</div>
+	<div class="chapter-body">
+					<div class="paragraph">
+<p>This plugin use cookies for the purposes described below:</p>
+</div><table class="tableblock frame-all grid-all spread">
+<colgroup>
+<col style="width: 16%;"/>
+<col style="width: 16%;"/>
+<col style="width: 16%;"/>
+<col style="width: 16%;"/>
+<col style="width: 33%;"/>
+</colgroup>
+<thead>
+<tr>
+<th class="tableblock halign-left valign-top">Name</th>
+<th class="tableblock halign-left valign-top">Purpose</th>
+<th class="tableblock halign-left valign-top">Duration</th>
+<th class="tableblock halign-left valign-top">Origin</th>
+<th class="tableblock halign-left valign-top">Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td class="tableblock halign-left valign-top"><p class="tableblock"><code>postfinancecheckoutNewUi</code></p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Functional</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">Persistent (10 years)</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">PostFinance Checkout</p></td>
+<td class="tableblock halign-left valign-top"><p class="tableblock">UI-version toggle for the PostFinance Checkout merchant portal (old vs. new UI). Set automatically on every login based on the user&#8217;s stored preference, and can be toggled by the user. HttpOnly, Secure on HTTPS.</p></td>
+</tr>
+</tbody>
+</table>					</div>
 </div>	<div class="chapter" id="_faq">
 	<div class="chapter-title">
 		<h1>
-			<span class="title-number">8</span>FAQ					</h1>
+			<span class="title-number">9</span>FAQ					</h1>
 	</div>
 	<div class="chapter-body">
 							<div class="section" id="_how_can_i_make_the_payment_methods_appear_in_the_checkout">
 	<div class="section-title">
 		<h2>
-			<span class="title-number">8.1</span>How can I make the payment methods appear in the checkout?					</h2>
+			<span class="title-number">9.1</span>How can I make the payment methods appear in the checkout?					</h2>
 	</div>
 	<div class="section-body">
 					<div class="paragraph">
@@ -369,7 +404,7 @@ The payment methods are only displayed if the plugin&#8217;s total calculation m
 </div>	<div class="chapter" id="_support">
 	<div class="chapter-title">
 		<h1>
-			<span class="title-number">9</span>Support					</h1>
+			<span class="title-number">10</span>Support					</h1>
 	</div>
 	<div class="chapter-body">
 					<div class="paragraph">
@@ -488,20 +523,25 @@ The payment methods are only displayed if the plugin&#8217;s total calculation m
 		<span class="item-title">Error logging</span>
 			</a>
     </li>					<li class="nav-level-1">
-	<a href="#_faq">
+	<a href="#_gdpr">
 		<span class="item-number">8</span>
+		<span class="item-title">GDPR</span>
+			</a>
+    </li>					<li class="nav-level-1">
+	<a href="#_faq">
+		<span class="item-number">9</span>
 		<span class="item-title">FAQ</span>
 			</a>
         	<ul  class="nav">
     		    			<li class="nav-level-2">
 	<a href="#_how_can_i_make_the_payment_methods_appear_in_the_checkout">
-		<span class="item-number">8.1</span>
+		<span class="item-number">9.1</span>
 		<span class="item-title">How can I make the payment methods appear in the checkout?</span>
 			</a>
     </li>    		    	</ul>
     </li>					<li class="nav-level-1">
 	<a href="#_support">
-		<span class="item-number">9</span>
+		<span class="item-number">10</span>
 		<span class="item-title">Support</span>
 			</a>
     </li>			</ul>

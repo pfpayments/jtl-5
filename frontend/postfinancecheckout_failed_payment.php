@@ -50,26 +50,9 @@ if ($transactionId) {
             // This triggers the standard 'Storno' routine which releases stock reservations
             // correctly and updates the order status to 'Cancelled'.
             // We use this instead of manual stock updates to ensure data integrity.
-            $order = new \JTL\Checkout\Bestellung($orderId);
-            if (!empty($order->kZahlungsart)) {
-                $paymentMethodEntity = new \JTL\Checkout\Zahlungsart((int)$order->kZahlungsart);
-                $paymentMethod = new \JTL\Plugin\Payment\Method($paymentMethodEntity->cModulId);
-
-                PostFinanceCheckoutHelper::log("failed_payment: Cancelling Order $orderId via native cancelOrder routine.");
-                $paymentMethod->cancelOrder($orderId);
-
-                // Since JTL's native cancelOrder doesn't release stock, we handle it manually but safely.
-                // We use an additive UPDATE to avoid race conditions with other orders.
-                $order->fuelleBestellung(false);
-                foreach ($order->Positionen as $pos) {
-                    if ((int)$pos->nPosTyp === \C_WARENKORBPOS_TYP_ARTIKEL && (int)$pos->kArtikel > 0) {
-                        PostFinanceCheckoutHelper::log("failed_payment: Restoring stock for Product $pos->kArtikel (Qty: $pos->nAnzahl)");
-                        Shop::Container()->getDB()->queryPrepared(
-                            "UPDATE tartikel SET fLagerbestand = fLagerbestand + :qty WHERE kArtikel = :id",
-                            ['qty' => (float)$pos->nAnzahl, 'id' => (int)$pos->kArtikel]
-                        );
-                    }
-                }
+            $orderCancelled = $transactionService->cancelOrderOnce($orderId);
+            if ($orderCancelled) {
+                $transactionService->restoreStock($orderId);
             }
         }
     }

@@ -267,5 +267,25 @@ class PostFinanceCheckoutHelper extends Helper
         $timestamp = date('Y-m-d H:i:s');
         \file_put_contents($logFile, "[$timestamp] $message" . \PHP_EOL, \FILE_APPEND);
     }
+
+    /**
+     * @param string $tableName
+     * @param string $columnName
+     * @return bool
+     */
+    public static function checkDBColumnExists(string $tableName, string $columnName): bool
+    {
+        $db = Shop::Container()->getDB();
+        $row = $db->getSingleObject(
+            "SELECT 1 AS ok
+                FROM information_schema.COLUMNS
+            WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME   = :tableName
+                AND COLUMN_NAME  = :columnName
+            LIMIT 1",
+            ['tableName' => $tableName, 'columnName' => $columnName]
+        );
+        return $row !== null;
+    }
 }
 

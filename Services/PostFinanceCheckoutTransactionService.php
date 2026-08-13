@@ -7,6 +7,7 @@ use JTL\Cart\CartItem;
 use JTL\Checkout\Bestellung;
 use JTL\Checkout\OrderHandler;
 use JTL\Checkout\Zahlungsart;
+use JTL\DB\ReturnType;
 use JTL\Helpers\Tax;
 use JTL\Mail\Mail\Mail;
 use JTL\Mail\Mailer;
@@ -255,23 +256,9 @@ class PostFinanceCheckoutTransactionService
     private function cancelOrderAfterConfirmFailure(int $orderId): void
     {
         try {
-            $order = new Bestellung($orderId);
-            if (empty($order->kZahlungsart)) {
-                return;
-            }
-
-            $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-            $paymentMethod = new Method($paymentMethodEntity->cModulId ?? '');
-            $paymentMethod->cancelOrder($orderId);
-
-            $order->fuelleBestellung(false);
-            foreach ($order->Positionen as $pos) {
-                if ((int)$pos->nPosTyp === \C_WARENKORBPOS_TYP_ARTIKEL && (int)$pos->kArtikel > 0) {
-                    Shop::Container()->getDB()->queryPrepared(
-                        'UPDATE tartikel SET fLagerbestand = fLagerbestand + :qty WHERE kArtikel = :id',
-                        ['qty' => (float)$pos->nAnzahl, 'id' => (int)$pos->kArtikel]
-                    );
-                }
+            $orderCancelled = $this->cancelOrderOnce($orderId);
+            if ($orderCancelled) {
+                $this->restoreStock($orderId);
             }
         } catch (\Throwable $t) {
             PostFinanceCheckoutHelper::log(
@@ -979,6 +966,71 @@ class PostFinanceCheckoutTransactionService
                 'trace' => $e->getTraceAsString()
             ]);
             return false;
+        }
+    }
+
+    public function cancelOrderOnce(int $orderId): bool {
+        if ($orderId <= 0) {
+            return false;
+        }
+
+        $order = new Bestellung($orderId);
+
+        if ((int)$order->cStatus === \BESTELLUNG_STATUS_STORNO) {
+            PostFinanceCheckoutHelper::log("cancelOrderOnce: Order $orderId is already cancelled.");
+            return false;
+        }
+
+        if (empty($order->kZahlungsart) ) {
+            PostFinanceCheckoutHelper::log("cancelOrderOnce: Order $orderId has no payment method.");
+            return false;
+        }
+
+        if (PostFinanceCheckoutHelper::checkDBColumnExists('postfinancecheckout_transactions', 'cancellation_email_sent')) {
+            $db = Shop::Container()->getDB();
+            $affected = (int)$db->queryPrepared(
+                "UPDATE postfinancecheckout_transactions
+                    SET cancellation_email_sent = 1, updated_at = NOW()
+                WHERE order_id = :orderId
+                    AND cancellation_email_sent = 0",
+                ['orderId' => (string)$orderId],
+                ReturnType::AFFECTED_ROWS
+            );
+
+            if ($affected < 1) {
+                $row = $db->select('postfinancecheckout_transactions', 'order_id', (string)$orderId);
+                if (!empty($row)) {
+                    PostFinanceCheckoutHelper::log("cancelOrderOnce: The cancellation email for order $orderId has already been marked as sent.");
+                    return false;
+                }
+            }
+        }
+
+        $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
+        $paymentMethod = new Method($paymentMethodEntity->cModulId ?? '');
+        PostFinanceCheckoutHelper::log("cancelOrderOnce: Cancelling order $orderId.");
+        $paymentMethod->cancelOrder($orderId);
+
+        return true;
+    }
+
+    public function restoreStock(int $orderId) {
+        if ($orderId <= 0) {
+            return false;
+        }
+        $order = new Bestellung($orderId);
+
+        // Since JTL's native cancelOrder doesn't release stock, we handle it manually but safely.
+        // We use an additive UPDATE to avoid race conditions with other orders.
+        $order->fuelleBestellung(false);
+        foreach ($order->Positionen as $pos) {
+            if ((int)$pos->nPosTyp === \C_WARENKORBPOS_TYP_ARTIKEL && (int)$pos->kArtikel > 0) {
+                PostFinanceCheckoutHelper::log("cancelOrderOnce: Restoring stock for Product $pos->kArtikel (Qty: $pos->nAnzahl)");
+                Shop::Container()->getDB()->queryPrepared(
+                   "UPDATE tartikel SET fLagerbestand = fLagerbestand + :qty WHERE kArtikel = :id",
+                    ['qty' => (float)$pos->nAnzahl, 'id' => (int)$pos->kArtikel]
+                );
+            }
         }
     }
 

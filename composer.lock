@@ -4,20 +4,20 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "ec23122a6dbeb7e9c8ab6890ab7288c2",
+    "content-hash": "8e3ad54f2dc5b267cc360842110068e0",
     "packages": [
         {
             "name": "postfinancecheckout/sdk",
-            "version": "4.8.1",
+            "version": "4.9.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/pfpayments/php-sdk.git",
-                "reference": "d331edcb55176939bc6364035a5310984df0ed4a"
+                "reference": "20e47f14dbb8fde1966f6183753bc7e8e21f9d66"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/pfpayments/php-sdk/zipball/d331edcb55176939bc6364035a5310984df0ed4a",
-                "reference": "d331edcb55176939bc6364035a5310984df0ed4a",
+                "url": "https://api.github.com/repos/pfpayments/php-sdk/zipball/20e47f14dbb8fde1966f6183753bc7e8e21f9d66",
+                "reference": "20e47f14dbb8fde1966f6183753bc7e8e21f9d66",
                 "shasum": ""
             },
             "require": {
@@ -59,9 +59,9 @@
                 "sdk"
             ],
             "support": {
-                "source": "https://github.com/pfpayments/php-sdk/tree/4.8.1"
+                "source": "https://github.com/pfpayments/php-sdk/tree/4.9.1"
             },
-            "time": "2025-10-29T13:59:08+00:00"
+            "time": "2026-08-11T12:05:57+00:00"
         }
     ],
     "packages-dev": [],

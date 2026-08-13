@@ -83,13 +83,7 @@ class PostFinanceCheckoutNameOrderUpdateTransactionStrategy implements PostFinan
             case TransactionState::DECLINE:
             case TransactionState::VOIDED:
                 PostFinanceCheckoutHelper::log("webhook strategy: Transaction $transactionId in state $transactionState. Cancelling order $orderId.");
-                $order = new Bestellung($orderId);
-                if (!empty($order->kZahlungsart)) {
-                    $paymentMethodEntity = new Zahlungsart((int)$order->kZahlungsart);
-                    $moduleId = $paymentMethodEntity->cModulId ?? '';
-                    $paymentMethod = new Method($moduleId);
-                    $paymentMethod->cancelOrder($orderId);
-                }
+                $this->transactionService->cancelOrderOnce($orderId);
                 print 'Order ' . $orderId . ' status was updated to cancelled';
                 break;
         }
